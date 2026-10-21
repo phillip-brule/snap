@@ -204,3 +204,84 @@ ACTIONS = ["view", "stream", "download", "manage"]
 ROLES = ["administrator", "band_member", "crew", "press", "fan_club", "registered"]
 # Crew used to key off file-type categories; with section categories they rely on audience_level.
 CREW_CATEGORIES = set()
+# ============================================================
+# Google OAuth 2.0 / OpenID Connect Identity
+# ============================================================
+
+class OAuthIdentity(db.Model):
+    __tablename__ = "oauth_identities"
+
+    id = db.Column(
+        db.String(36),
+        primary_key=True,
+        default=_uuid,
+    )
+
+    user_id = db.Column(
+        db.String(36),
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    provider = db.Column(
+        db.String(30),
+        nullable=False,
+    )
+
+    subject = db.Column(
+        db.Text,
+        nullable=False,
+    )
+
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=_now,
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "provider",
+            "subject",
+            name="uq_oauth_provider_subject",
+        ),
+    )
+
+    user = db.relationship(
+        "User",
+        backref="oauth_identities",
+    )
+
+class WatermarkDownload(db.Model):
+    __tablename__ = "watermark_downloads"
+
+    download_id = db.Column(
+        db.String(36),
+        primary_key=True,
+    )
+
+    user_id = db.Column(
+        db.String(36),
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    content_id = db.Column(
+        db.String(36),
+        db.ForeignKey("content_items.id"),
+        nullable=False,
+        index=True,
+    )
+
+    watermark_type = db.Column(
+        db.String(50),
+        nullable=False,
+    )
+
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=_now,
+    )

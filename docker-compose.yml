@@ -9,7 +9,6 @@ services:
       POSTGRES_USER: snap
       POSTGRES_PASSWORD: snap
       POSTGRES_DB: snap_records
-    # ponytail: no host 5432 publish — local postgres already owns it; web reaches db via compose network
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -23,14 +22,22 @@ services:
     ports:
       - "5000:5000"
     environment:
-      FLASK_SECRET_KEY: dev-change-me
+      FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:?Set FLASK_SECRET_KEY in .env}
       DATABASE_URL: postgresql+psycopg2://snap:snap@db:5432/snap_records
       UPLOAD_FOLDER: /data/uploads
+      # Google OAuth / OpenID Connect
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:?Set GOOGLE_CLIENT_ID in .env}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
+      # Content encryption
+      CONTENT_KEK_PATH: /run/secrets/content_kek
     secrets:
       - content_kek
+
+
     volumes:
       - uploads:/data/uploads
       - ./app:/app/app
+
     depends_on:
       db:
         condition: service_healthy
