@@ -1,10 +1,22 @@
 # SNAP Records
 
 ```bash
+./kek_gen.sh      # content encryption master key
+./certs_gen.sh    # SNAP Root CA + nginx server certificate (TLS)
 docker compose up -d --build
 ```
 
-Open [http://localhost:5000](http://localhost:5000)
+Open https://localhost (http://localhost redirects to HTTPS; Flask is no longer exposed on :5000).
+
+To make the browser trust the server, import `certs/snap-root-ca.crt` as a trusted
+certificate authority (Firefox: Settings → Certificates → Authorities → Import;
+Chrome/Linux: `chrome://certificate-manager` → Custom → Trusted certificates).
+Check it from the command line with:
+
+```bash
+curl --cacert certs/snap-root-ca.crt -I https://localhost
+```
+
 
 | Email                 | Password     |
 | --------------------- | ------------ |
