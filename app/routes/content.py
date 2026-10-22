@@ -1,6 +1,7 @@
 import hashlib
 import mimetypes
 import os
+import io
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,7 +31,7 @@ from app.models import (
     User,
 )
 from app.policy import can_access, can_upload, log_access
-from app.crypto import encrypt_data
+from app.crypto import encrypt_data, decrypt_data
 
 bp = Blueprint("content", __name__, url_prefix="/content")
 
@@ -123,6 +124,13 @@ def detail(content_id):
     return render_template("content/detail.html", item=item, caps=caps, is_owner=is_owner)
 
 
+def _decrypt_file(storage_path, wrapped_dek):
+    with open(storage_path, "rb") as f:
+        ciphertext = f.read()
+    # TODO: implement exception handling and HTTP error codes
+    plaintext = decrypt_data(ciphertext, wrapped_dek)
+    return plaintext
+
 @bp.route("/<content_id>/download")
 @login_required
 def download(content_id):
@@ -131,12 +139,8 @@ def download(content_id):
     log_access(db, current_user, item, "download", allowed, reason, request)
     if not allowed:
         abort(403)
-    return send_file(
-        item.storage_path,
-        as_attachment=True,
-        download_name=item.original_filename or "download",
-        mimetype=item.mime_type,
-    )
+    plaintext = _decrypt_file(item.storage_path, item.wrapped_dek)
+    return send_file(io.BytesIO(plaintext), as_attachment=True, download_name=item.original_filename or "download", mimetype=item.mime_type)
 
 
 @bp.route("/<content_id>/stream")
@@ -147,7 +151,8 @@ def stream(content_id):
     log_access(db, current_user, item, "stream", allowed, reason, request)
     if not allowed:
         abort(403)
-    return send_file(item.storage_path, as_attachment=False, mimetype=item.mime_type)
+    plaintext = _decrypt_file(item.storage_path, item.wrapped_dek)
+    return send_file(io.BytesIO(plaintext), as_attachment=False, mimetype=item.mime_type)
 
 
 @bp.route("/<content_id>/edit", methods=["GET", "POST"])
