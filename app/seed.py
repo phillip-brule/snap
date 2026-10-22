@@ -2,13 +2,13 @@
 """Idempotent seed: SNAP Records, SNAP, sample users & content."""
 
 import mimetypes
-import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import current_app
 
 from app.extensions import db
+from app.crypto import encrypt_data
 from app.models import Band, ContentItem, Label, Membership, User
 
 
@@ -33,25 +33,21 @@ LEGACY_SAMPLE_TITLES = [
 MEDIA_DIR = Path(__file__).resolve().parent / "static" / "inspo" / "media"
 
 
-def _write_sample_file(folder: Path, name: str, text: str) -> Path:
+def _write_encrypted(folder: Path, name: str, plain: bytes) -> tuple[Path, bytes]:
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / name
-    path.write_text(text)
-    return path
+    ciphertext, wrapped_dek = encrypt_data(plain)
+    path.write_bytes(ciphertext)
+    return path, wrapped_dek
 
 
-def _copy_media(folder: Path, media_name: str) -> Path | None:
+def _copy_media(folder: Path, media_name: str) -> tuple[Path, bytes] | None:
     src = MEDIA_DIR / media_name
 
     if not src.is_file():
         print(f"Seed warning: missing media {src}")
         return None
-
-    folder.mkdir(parents=True, exist_ok=True)
-    dest = folder / media_name
-    shutil.copy2(src, dest)
-
-    return dest
+    return _write_encrypted(folder, media_name, src.read_bytes())
 
 
 def seed():
@@ -254,9 +250,9 @@ def seed():
         folder = upload_root / item.id
 
         if s.get("media"):
-            path = _copy_media(folder, s["media"])
-
-            if path:
+            copied = _copy_media(folder, s["media"])
+            if copied:
+                path, wrapped_dek = copied
                 item.storage_path = str(path)
                 item.original_filename = s["media"]
                 item.mime_type = (
@@ -264,19 +260,17 @@ def seed():
                     or "application/octet-stream"
                 )
                 item.size_bytes = path.stat().st_size
-
+                item.wrapped_dek = wrapped_dek
         else:
             fname = s.get("filename") or "note.txt"
-            path = _write_sample_file(
-                folder,
-                fname,
-                s.get("body") or "",
+            path, wrapped_dek = _write_encrypted(
+                folder, fname, (s.get("body") or "").encode()
             )
-
             item.storage_path = str(path)
             item.original_filename = fname
             item.mime_type = "text/plain"
             item.size_bytes = path.stat().st_size
+            item.wrapped_dek = wrapped_dek
 
     db.session.commit()
 

@@ -1,9 +1,10 @@
 
 import hashlib
+import io
 import mimetypes
 import os
 import secrets
-
+import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -21,6 +22,7 @@ from flask import (
 from flask_login import current_user, login_required
 from werkzeug.utils import secure_filename
 
+from app.crypto import decrypt_data, encrypt_data
 from app.extensions import db
 from app.models import (
     AUDIENCE_LEVELS,
@@ -34,7 +36,6 @@ from app.models import (
     WatermarkDownload,
 )
 from app.policy import can_access, can_upload, log_access
-from app.crypto import encrypt_data
 from app.watermark import SUPPORTED_TYPES, create_watermarked_copy
 
 bp = Blueprint("content", __name__, url_prefix="/content")
@@ -65,27 +66,18 @@ def _store_file(file_storage, item_id):
     ciphertext, wrapped_dek = encrypt_data(file_storage.read())
     path.write_bytes(ciphertext)
     checksum = hashlib.sha256(ciphertext).hexdigest()
-    mime = file_storage.mimetype or mimetypes.guess_type(name)[0]
-    return str(path), name, mime, len(ciphertext), checksum, wrapped_dek
-
-    file_storage.save(path)
-
-    # Calculate SHA-256 without loading the whole file into memory
-    sha256 = hashlib.sha256()
-    size = 0
-
-    with path.open("rb") as source:
-        for chunk in iter(lambda: source.read(1024 * 1024), b""):
-            sha256.update(chunk)
-            size += len(chunk)
-
     mime = (
-        mimetypes.guess_type(name)[0]
-        or file_storage.mimetype
+        file_storage.mimetype
+        or mimetypes.guess_type(name)[0]
         or "application/octet-stream"
     )
+    return str(path), name, mime, len(ciphertext), checksum, wrapped_dek
 
-    return str(path), name, mime, size, sha256.hexdigest()
+
+def _decrypt_file(storage_path, wrapped_dek):
+    with open(storage_path, "rb") as f:
+        ciphertext = f.read()
+    return decrypt_data(ciphertext, wrapped_dek)
 
 
 # ============================================================
@@ -145,7 +137,7 @@ def upload():
 
             db.session.add(item)
             db.session.flush()
-            path, fname, mime, size, checksum, wrapped_dek = _store_file(f, item.id)
+            path, fname, mime, size, checksum, wrapped_dek = _store_file(file, item.id)
             item.storage_path = path
             item.original_filename = fname
             item.mime_type = mime
@@ -222,7 +214,6 @@ def detail(content_id):
 def download(content_id):
     item = db.session.get(ContentItem, content_id) or abort(404)
 
-    # 1. Check access rights
     allowed, reason = can_access(
         current_user,
         item,
@@ -242,87 +233,81 @@ def download(content_id):
     if not allowed:
         abort(403)
 
-    # 2. Check the original file
     if (
         not item.storage_path
         or not os.path.isfile(item.storage_path)
+        or not item.wrapped_dek
     ):
         current_app.logger.warning(
-            "Missing file for content %s",
+            "Missing encrypted file for content %s",
             content_id,
         )
         abort(404)
 
-    # 3. Watermark supported formats
+    try:
+        plaintext = _decrypt_file(item.storage_path, item.wrapped_dek)
+    except Exception:
+        current_app.logger.exception(
+            "Decrypt failed for content %s", content_id
+        )
+        abort(500)
+
+    # Watermark supported formats from decrypted plaintext
     if item.mime_type in SUPPORTED_TYPES:
-
-        # 16 hexadecimal characters (64-bit random ID)
         download_id = secrets.token_hex(8)
-
+        suffix = Path(item.original_filename or "file").suffix or ".bin"
+        tmp_path = None
         try:
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                tmp.write(plaintext)
+                tmp_path = tmp.name
             data, mime, extension = create_watermarked_copy(
-                path=item.storage_path,
+                path=tmp_path,
                 mime_type=item.mime_type,
                 recipient_id=str(current_user.id),
                 download_id=download_id,
             )
-
         except Exception:
             current_app.logger.exception(
                 "Watermark generation failed for content %s",
                 content_id,
             )
             abort(500)
+        finally:
+            if tmp_path and os.path.isfile(tmp_path):
+                try:
+                    os.remove(tmp_path)
+                except OSError:
+                    pass
 
-        # 4. Record the personalised copy in PostgreSQL
         audit = WatermarkDownload(
             download_id=download_id,
             user_id=current_user.id,
             content_id=item.id,
             watermark_type=mime,
         )
-
         try:
             db.session.add(audit)
             db.session.commit()
-
         except Exception:
             db.session.rollback()
-
-            current_app.logger.exception(
-                "Failed to save watermark audit"
-            )
+            current_app.logger.exception("Failed to save watermark audit")
             abort(500)
 
-        current_app.logger.info(
-            "Watermarked download: user=%s content=%s copy=%s",
-            current_user.id,
-            content_id,
-            download_id,
-        )
-
-        # 5. Send the personalised copy
-        original_name = Path(
-            item.original_filename or "download"
-        ).stem
-
+        original_name = Path(item.original_filename or "download").stem
         filename = f"{original_name}_watermarked{extension}"
-
         response = send_file(
             data,
             as_attachment=True,
             download_name=filename,
             mimetype=mime,
         )
-
         response.headers["Cache-Control"] = "private, no-store"
         response.headers["X-Content-Type-Options"] = "nosniff"
-
         return response
 
-    # Other formats: original behaviour
     return send_file(
-        item.storage_path,
+        io.BytesIO(plaintext),
         as_attachment=True,
         download_name=item.original_filename or "download",
         mimetype=item.mime_type,
@@ -357,8 +342,23 @@ def stream(content_id):
     if not allowed:
         abort(403)
 
+    if (
+        not item.storage_path
+        or not os.path.isfile(item.storage_path)
+        or not item.wrapped_dek
+    ):
+        abort(404)
+
+    try:
+        plaintext = _decrypt_file(item.storage_path, item.wrapped_dek)
+    except Exception:
+        current_app.logger.exception(
+            "Decrypt failed for content %s", content_id
+        )
+        abort(500)
+
     return send_file(
-        item.storage_path,
+        io.BytesIO(plaintext),
         as_attachment=False,
         mimetype=item.mime_type,
     )
@@ -450,7 +450,7 @@ def edit(content_id):
                         os.remove(item.storage_path)
                     except OSError:
                         pass
-                path, fname, mime, size, checksum, wrapped_dek = _store_file(f, item.id)
+                path, fname, mime, size, checksum, wrapped_dek = _store_file(file, item.id)
 
                 item.storage_path = path
                 item.original_filename = fname

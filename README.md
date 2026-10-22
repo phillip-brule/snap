@@ -18,3 +18,7 @@ Open http://localhost:5000
 ```bash
 docker compose down
 ```
+To follow service:
+```bash
+docker compose logs -f <service>
+```
