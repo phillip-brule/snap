@@ -1,6 +1,8 @@
 secrets:
   content_kek:
     file: ./secrets/content_kek
+  tls_server_key:
+    file: ./secrets/server.key
 
 services:
   db:
@@ -18,12 +20,27 @@ services:
       timeout: 3s
       retries: 10
 
+  nginx:
+    image: nginx:1.27-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    secrets:
+      - tls_server_key
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./certs/fullchain.crt:/etc/nginx/certs/fullchain.crt:ro
+    depends_on:
+      - web
+
   web:
     build: .
-    ports:
-      - "5000:5000"
+    # only reachable through nginx (HTTPS); no host port published
+    expose:
+      - "5000"
     environment:
       FLASK_SECRET_KEY: dev-change-me
+      BEHIND_PROXY: "1"
       DATABASE_URL: postgresql+psycopg2://snap:snap@db:5432/snap_records
       UPLOAD_FOLDER: /data/uploads
     secrets:

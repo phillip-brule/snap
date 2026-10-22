@@ -50,7 +50,7 @@ flowchart TB
 
 | Component | Responsibility |
 |-----------|----------------|
-| Nginx | Terminate TLS (later), forward HTTP to Flask, security headers (later) |
+| Nginx | Terminate TLS with a certificate signed by the SNAP Root CA (`certs_gen.sh`), redirect HTTP→HTTPS, HSTS and security headers, forward HTTP to Flask |
 | Flask | Pages, forms, session auth, upload/download, permission UI, access logging, in-app authorization |
 | `can_access` | Single policy entrypoint: role + membership + audience + time windows + grants. Later: call XACML PDP |
 | PostgreSQL | Label, bands, users, memberships, invitations, content metadata, grants, access logs. Later: wrapped file keys, encrypted fields |
@@ -105,7 +105,7 @@ Single label means no tenant router and no per-label DB. One PostgreSQL database
 
 ```mermaid
 flowchart LR
-  Internet[Internet] -->|HTTPS_later| DMZ[Nginx]
+  Internet[Internet] -->|HTTPS| DMZ[Nginx]
   DMZ -->|HTTP_internal| App[Flask]
   App --> DB[(PostgreSQL)]
   App --> Files[Volume]
