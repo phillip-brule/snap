@@ -9,7 +9,7 @@
     <label>Email</label>
     <input type="email" name="email" required>
     <label>Password</label>
-    <input type="password" name="password" required minlength="6">
+    <input type="password" name="password" required minlength="8" maxlength="128" autocomplete="new-password">
     <button type="submit">
       <img class="btn-snap" src="{{ url_for('static', filename='inspo/snaps/snap_1.jpg') }}" alt="">
       Create account

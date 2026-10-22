@@ -2,9 +2,13 @@ import uuid
 from datetime import datetime, timezone
 
 from flask_login import UserMixin
-from werkzeug.security import check_password_hash, generate_password_hash
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
 
 from app.extensions import db
+
+# Argon2id (argon2-cffi default, RFC 9106 parameters) with a random unique salt per hash.
+ph = PasswordHasher()
 
 
 def _uuid():
@@ -55,18 +59,27 @@ class User(UserMixin, db.Model):
     email_verified = db.Column(db.Boolean, nullable=False, default=False)
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
     last_login_at = db.Column(db.DateTime(timezone=True))
+    failed_attempts = db.Column(db.Integer, nullable=False, default=0)
+    locked_until = db.Column(db.DateTime(timezone=True))
+    totp_secret = db.Column(db.Text)
+    totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
 
     label = db.relationship("Label", back_populates="users")
     memberships = db.relationship("Membership", back_populates="user", cascade="all, delete-orphan")
 
     def set_password(self, password):
-        # ponytail: werkzeug default hash for prototype; Argon2 deferred to security phase
-        self.password_hash = generate_password_hash(password)
+        self.password_hash = ph.hash(password)
 
     def check_password(self, password):
         if not self.password_hash:
             return False
-        return check_password_hash(self.password_hash, password)
+        try:
+            ph.verify(self.password_hash, password)
+        except (VerificationError, InvalidHashError):
+            return False
+        if ph.check_needs_rehash(self.password_hash):
+            self.password_hash = ph.hash(password)
+        return True
 
     def roles_for_band(self, band_id):
         return [m.role for m in self.memberships if m.band_id == band_id]

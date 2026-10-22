@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Set up 2FA — SNAP Records{% endblock %}
+{% block body %}
+<div class="panel auth-box">
+  <h1>Two-factor authentication</h1>
+  <p class="muted">Professional accounts must enable TOTP. Scan this QR with Google Authenticator or Authy, then enter the 6-digit code.</p>
+  <p style="text-align:center">
+    <img src="{{ qr_data_uri }}" alt="TOTP QR code" width="220" height="220">
+  </p>
+  <p class="hint">If you cannot scan: <code>{{ secret }}</code></p>
+  <form method="post">
+    <label>Authenticator code</label>
+    <input type="text" name="code" required inputmode="numeric" autocomplete="one-time-code" minlength="6" maxlength="6">
+    <button type="submit">Enable 2FA</button>
+  </form>
+</div>
+{% endblock %}
