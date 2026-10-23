@@ -22,7 +22,7 @@ def login():
     if request.method == "POST":
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
-        user = User.query.filter_by(email=email).first()
+        user = User.find_by_email(email)
         if not user or not user.check_password(password):
             flash("Invalid email or password.", "error")
         elif user.status != "active":
@@ -46,22 +46,21 @@ def register():
         password = request.form.get("password") or ""
         if not email or not display_name or not password:
             flash("All fields are required.", "error")
-        elif User.query.filter_by(email=email).first():
+        elif User.find_by_email(email):
             flash("Email already registered.", "error")
         else:
             label = Label.query.filter_by(slug="snap-records").first()
             user = User(
                 label_id=label.id,
-                email=email,
                 display_name=display_name,
                 account_type="fan",
                 status="active",
                 email_verified=False,
             )
+            user.email = email
             user.set_password(password)
             db.session.add(user)
             db.session.flush()
-            # registered users get public content only; optional membership
             from app.models import Band
 
             band = Band.query.filter_by(slug="snap").first()
@@ -96,18 +95,18 @@ def accept_invite(token):
         if not display_name or not password:
             flash("Name and password required.", "error")
         else:
-            existing = User.query.filter_by(email=inv.email.lower()).first()
+            existing = User.find_by_email(inv.email.lower())
             if existing:
                 flash("Account already exists — log in.", "error")
                 return redirect(url_for("auth.login"))
             user = User(
                 label_id=inv.label_id,
-                email=inv.email.lower(),
                 display_name=display_name,
                 account_type="professional",
                 status="active",
                 email_verified=True,
             )
+            user.email = inv.email.lower()
             user.set_password(password)
             db.session.add(user)
             db.session.flush()
