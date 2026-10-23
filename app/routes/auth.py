@@ -2,7 +2,7 @@
 import hashlib
 from datetime import datetime, timedelta, timezone
 
-from flask import Blueprint, current_app, flash, redirect, render_template, request, session, url_for
+from flask import Blueprint, flash, redirect, render_template, request, session, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app import oauth
@@ -355,10 +355,12 @@ def register():
             user.set_password(password)
             db.session.add(user)
             db.session.flush()
-            current_app.logger.info(
-                "register: plain_email=%s email_hash=%s",
-                email,
-                user.email_hash,
+            # print (not Flask logger): gunicorn does not show app.logger.info by default
+            print(
+                f"register: plain_email={email} "
+                f"email_enc_hex={user.email_enc[:20].hex()}... "
+                f"email_hash={user.email_hash}",
+                flush=True,
             )
 
             band = Band.query.filter_by(
