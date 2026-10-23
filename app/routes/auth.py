@@ -101,7 +101,7 @@ def login():
         email = (request.form.get("email") or "").strip().lower()
         password = request.form.get("password") or ""
 
-        user = User.query.filter_by(email=email).first()
+        user = User.find_by_email(email)
         now = datetime.now(timezone.utc)
 
         if not user:
@@ -243,7 +243,7 @@ def google_callback():
     else:
         # Never automatically take over an existing SNAP
         # account based on a matching email address.
-        existing = User.query.filter_by(email=email).first()
+        existing = User.find_by_email(email)
 
         if existing:
             flash(
@@ -268,12 +268,12 @@ def google_callback():
         # Create a new fan account with public-only access.
         user = User(
             label_id=label.id,
-            email=email,
             display_name=userinfo.get("name") or email,
             account_type="fan",
             status="active",
             email_verified=True,
         )
+        user.email = email
 
         # No local password for Google-only accounts.
         db.session.add(user)
@@ -336,7 +336,7 @@ def register():
             flash("All fields are required.", "error")
         elif pw_error:
             flash(pw_error, "error")
-        elif User.query.filter_by(email=email).first():
+        elif User.find_by_email(email):
             flash("Email already registered.", "error")
 
         else:
@@ -346,13 +346,12 @@ def register():
 
             user = User(
                 label_id=label.id,
-                email=email,
                 display_name=display_name,
                 account_type="fan",
                 status="active",
                 email_verified=False,
             )
-
+            user.email = email
             user.set_password(password)
             db.session.add(user)
             db.session.flush()
@@ -419,10 +418,7 @@ def accept_invite(token):
             flash(pw_error, "error")
 
         else:
-            existing = User.query.filter_by(
-                email=inv.email.lower()
-            ).first()
-
+            existing = User.find_by_email(inv.email.lower())
             if existing:
                 flash(
                     "Account already exists — log in.",
@@ -432,13 +428,12 @@ def accept_invite(token):
 
             user = User(
                 label_id=inv.label_id,
-                email=inv.email.lower(),
                 display_name=display_name,
                 account_type="professional",
                 status="active",
                 email_verified=True,
             )
-
+            user.email = inv.email.lower()
             user.set_password(password)
             db.session.add(user)
             db.session.flush()

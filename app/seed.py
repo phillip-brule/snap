@@ -73,18 +73,16 @@ def seed():
     users_by_email = {}
 
     for email, name, acct, role, band_slug, password in SAMPLE_USERS:
-        user = User.query.filter_by(email=email).first()
-
+        user = User.find_by_email(email)
         if not user:
             user = User(
                 label_id=label.id,
-                email=email,
                 display_name=name,
                 account_type=acct,
                 status="active",
                 email_verified=True,
             )
-
+            user.email = email
             user.set_password(password)
             db.session.add(user)
             db.session.flush()

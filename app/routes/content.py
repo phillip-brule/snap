@@ -536,9 +536,7 @@ def permissions(content_id):
             ).strip().lower()
 
             grant_action = request.form.get("grant_action")
-
-            user = User.query.filter_by(email=email).first()
-
+            user = User.find_by_email(email)
             if not user or grant_action not in ACTIONS:
                 flash(
                     "Unknown user or invalid action.",
