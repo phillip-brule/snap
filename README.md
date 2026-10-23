@@ -37,10 +37,18 @@ docker compose exec web sh -c 'head -c 64 file_to_show | xxd'
 docker compose exec web sh -c 'tail -c 12 file_to_show | xxd'
 ```
 
-Partial DB encryption (email ciphertext + blind index):
+Partial DB encryption demo:
 
 ```bash
+# 1. latest user BEFORE signup
 docker compose exec db psql -U snap -d snap_records -c \
-  "SELECT left(encode(email_enc,'hex'),40) AS email_enc_hex, left(email_hash,16) AS email_hash FROM users LIMIT 5;"
+  "SELECT display_name, left(encode(email_enc,'hex'),40) AS email_enc_hex, email_hash, created_at FROM users ORDER BY created_at DESC LIMIT 1;"
+
+# 2. follow web logs, then register at /register
+docker compose logs -f web
+
+# 3. latest user AFTER signup (match email_hash from the log line)
+docker compose exec db psql -U snap -d snap_records -c \
+  "SELECT display_name, left(encode(email_enc,'hex'),40) AS email_enc_hex, email_hash, created_at FROM users ORDER BY created_at DESC LIMIT 1;"
 ```
 

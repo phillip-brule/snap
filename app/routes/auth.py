@@ -2,7 +2,7 @@ import hashlib
 import secrets
 from datetime import datetime, timezone
 
-from flask import Blueprint, flash, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 from flask_login import current_user, login_required, login_user, logout_user
 
 from app.extensions import db
@@ -61,6 +61,11 @@ def register():
             user.set_password(password)
             db.session.add(user)
             db.session.flush()
+            current_app.logger.info(
+                "register: plain_email=%s email_hash=%s",
+                email,
+                user.email_hash,
+            )
             from app.models import Band
 
             band = Band.query.filter_by(slug="snap").first()
