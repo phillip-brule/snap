@@ -128,10 +128,7 @@ def upload():
                 available_from_fans=_parse_dt(
                     request.form.get("available_from_fans")
                 ),
-                is_public=(
-                    bool(request.form.get("is_public"))
-                    or audience == "public"
-                ),
+                is_public=audience == "public",
                 storage_path="pending",
             )
 
@@ -423,20 +420,13 @@ def edit(content_id):
 
             item.category = category
             item.audience_level = audience
-
             item.available_from_press = _parse_dt(
                 request.form.get("available_from_press")
             )
-
             item.available_from_fans = _parse_dt(
                 request.form.get("available_from_fans")
             )
-
-            item.is_public = (
-                bool(request.form.get("is_public"))
-                or audience == "public"
-            )
-
+            item.is_public = audience == "public"
             item.updated_at = datetime.now(timezone.utc)
 
             file = request.files.get("file")
@@ -510,20 +500,13 @@ def permissions(content_id):
 
             if audience in AUDIENCE_LEVELS:
                 item.audience_level = audience
-
                 item.available_from_press = _parse_dt(
                     request.form.get("available_from_press")
                 )
-
                 item.available_from_fans = _parse_dt(
                     request.form.get("available_from_fans")
                 )
-
-                item.is_public = (
-                    bool(request.form.get("is_public"))
-                    or audience == "public"
-                )
-
+                item.is_public = audience == "public"
                 item.updated_at = datetime.now(timezone.utc)
 
                 db.session.commit()
