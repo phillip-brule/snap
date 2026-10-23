@@ -82,7 +82,7 @@ def upload():
                 audience_level=audience,
                 available_from_press=_parse_dt(request.form.get("available_from_press")),
                 available_from_fans=_parse_dt(request.form.get("available_from_fans")),
-                is_public=bool(request.form.get("is_public")) or audience == "public",
+                is_public=audience == "public",
                 storage_path="pending",
             )
             db.session.add(item)
@@ -184,7 +184,7 @@ def edit(content_id):
             item.audience_level = audience
             item.available_from_press = _parse_dt(request.form.get("available_from_press"))
             item.available_from_fans = _parse_dt(request.form.get("available_from_fans"))
-            item.is_public = bool(request.form.get("is_public")) or audience == "public"
+            item.is_public = audience == "public"
             item.updated_at = datetime.now(timezone.utc)
             f = request.files.get("file")
             if f and f.filename:
@@ -230,7 +230,7 @@ def permissions(content_id):
                 item.audience_level = audience
                 item.available_from_press = _parse_dt(request.form.get("available_from_press"))
                 item.available_from_fans = _parse_dt(request.form.get("available_from_fans"))
-                item.is_public = bool(request.form.get("is_public")) or audience == "public"
+                item.is_public = audience == "public"
                 item.updated_at = datetime.now(timezone.utc)
                 db.session.commit()
                 flash("Permissions updated.", "ok")
