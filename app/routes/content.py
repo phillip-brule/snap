@@ -4,7 +4,6 @@ import io
 import mimetypes
 import os
 import secrets
-import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -249,17 +248,12 @@ def download(content_id):
         )
         abort(500)
 
-    # Watermark supported formats from decrypted plaintext
+    # Per-download watermark in RAM (recipient + copy id); no /tmp plaintext
     if item.mime_type in SUPPORTED_TYPES:
         download_id = secrets.token_hex(8)
-        suffix = Path(item.original_filename or "file").suffix or ".bin"
-        tmp_path = None
         try:
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(plaintext)
-                tmp_path = tmp.name
             data, mime, extension = create_watermarked_copy(
-                path=tmp_path,
+                data=plaintext,
                 mime_type=item.mime_type,
                 recipient_id=str(current_user.id),
                 download_id=download_id,
@@ -270,12 +264,6 @@ def download(content_id):
                 content_id,
             )
             abort(500)
-        finally:
-            if tmp_path and os.path.isfile(tmp_path):
-                try:
-                    os.remove(tmp_path)
-                except OSError:
-                    pass
 
         audit = WatermarkDownload(
             download_id=download_id,
