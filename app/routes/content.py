@@ -140,6 +140,8 @@ def upload():
             item.size_bytes = size
             item.checksum_sha256 = checksum
             item.wrapped_dek = wrapped_dek
+            item.contract_amount = request.form.get("contract_amount")
+            item.rider_fee = request.form.get("rider_fee")
 
             db.session.commit()
 
@@ -381,6 +383,7 @@ def edit(content_id):
 
         if request.form.get("delete"):
             item.is_deleted = True
+            item.wrapped_dek = None  # crypto-shred: ciphertext alone is useless
             item.updated_at = datetime.now(timezone.utc)
 
             db.session.commit()
@@ -415,6 +418,8 @@ def edit(content_id):
                 request.form.get("available_from_fans")
             )
             item.is_public = audience == "public"
+            item.contract_amount = request.form.get("contract_amount")
+            item.rider_fee = request.form.get("rider_fee")
             item.updated_at = datetime.now(timezone.utc)
 
             file = request.files.get("file")

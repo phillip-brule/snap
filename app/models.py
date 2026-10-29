@@ -59,8 +59,9 @@ class User(UserMixin, db.Model):
     last_login_at = db.Column(db.DateTime(timezone=True))
     failed_attempts = db.Column(db.Integer, nullable=False, default=0)
     locked_until = db.Column(db.DateTime(timezone=True))
-    totp_secret = db.Column(db.Text)
+    totp_secret_enc = db.Column(db.LargeBinary)
     totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
+    contact_details_enc = db.Column(db.LargeBinary)
 
     label = db.relationship("Label", back_populates="users")
     memberships = db.relationship("Membership", back_populates="user", cascade="all, delete-orphan")
@@ -80,6 +81,41 @@ class User(UserMixin, db.Model):
         norm = (value or "").strip().lower()
         self.email_enc = encrypt_field(norm.encode("utf-8"))
         self.email_hash = blind_index(norm)
+
+    @property
+    def totp_secret(self):
+        from app.crypto import decrypt_field
+
+        if not self.totp_secret_enc:
+            return None
+        return decrypt_field(self.totp_secret_enc).decode("utf-8")
+
+    @totp_secret.setter
+    def totp_secret(self, value):
+        from app.crypto import encrypt_field
+
+        if value is None:
+            self.totp_secret_enc = None
+        else:
+            self.totp_secret_enc = encrypt_field(value.encode("utf-8"))
+
+    @property
+    def contact_details(self):
+        from app.crypto import decrypt_field
+
+        if not self.contact_details_enc:
+            return None
+        return decrypt_field(self.contact_details_enc).decode("utf-8")
+
+    @contact_details.setter
+    def contact_details(self, value):
+        from app.crypto import encrypt_field
+
+        text = (value or "").strip()
+        if not text:
+            self.contact_details_enc = None
+        else:
+            self.contact_details_enc = encrypt_field(text.encode("utf-8"))
 
     @classmethod
     def find_by_email(cls, email):
@@ -142,7 +178,7 @@ class Invitation(db.Model):
     id = db.Column(db.String(36), primary_key=True, default=_uuid)
     label_id = db.Column(db.String(36), db.ForeignKey("labels.id"), nullable=False)
     invited_by_user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=False)
-    email = db.Column(db.Text, nullable=False, index=True)
+    email_enc = db.Column(db.LargeBinary, nullable=False)
     intended_role = db.Column(db.Text, nullable=False)
     band_id = db.Column(db.String(36), db.ForeignKey("bands.id"), nullable=True)
     token_hash = db.Column(db.Text, nullable=False, unique=True)
@@ -150,6 +186,21 @@ class Invitation(db.Model):
     expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
     accepted_at = db.Column(db.DateTime(timezone=True))
     created_at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
+
+    @property
+    def email(self):
+        from app.crypto import decrypt_field
+
+        if not self.email_enc:
+            return None
+        return decrypt_field(self.email_enc).decode("utf-8")
+
+    @email.setter
+    def email(self, value):
+        from app.crypto import encrypt_field
+
+        norm = (value or "").strip().lower()
+        self.email_enc = encrypt_field(norm.encode("utf-8"))
 
 
 class ContentItem(db.Model):
@@ -168,6 +219,8 @@ class ContentItem(db.Model):
     storage_path = db.Column(db.Text, nullable=False)
     wrapped_dek = db.Column(db.LargeBinary)  # AES-GCM sealed DEK (nonce|tag|dek)
     checksum_sha256 = db.Column(db.Text)
+    contract_amount_enc = db.Column(db.LargeBinary)
+    rider_fee_enc = db.Column(db.LargeBinary)
     available_from_press = db.Column(db.DateTime(timezone=True))
     available_from_fans = db.Column(db.DateTime(timezone=True))
     is_public = db.Column(db.Boolean, nullable=False, default=False)
@@ -178,6 +231,42 @@ class ContentItem(db.Model):
     band = db.relationship("Band", back_populates="content_items")
     uploader = db.relationship("User", foreign_keys=[uploaded_by_user_id])
     grants = db.relationship("ContentGrant", back_populates="content_item", cascade="all, delete-orphan")
+
+    @property
+    def contract_amount(self):
+        from app.crypto import decrypt_field
+
+        if not self.contract_amount_enc:
+            return None
+        return decrypt_field(self.contract_amount_enc).decode("utf-8")
+
+    @contract_amount.setter
+    def contract_amount(self, value):
+        from app.crypto import encrypt_field
+
+        text = (value or "").strip()
+        if not text:
+            self.contract_amount_enc = None
+        else:
+            self.contract_amount_enc = encrypt_field(text.encode("utf-8"))
+
+    @property
+    def rider_fee(self):
+        from app.crypto import decrypt_field
+
+        if not self.rider_fee_enc:
+            return None
+        return decrypt_field(self.rider_fee_enc).decode("utf-8")
+
+    @rider_fee.setter
+    def rider_fee(self, value):
+        from app.crypto import encrypt_field
+
+        text = (value or "").strip()
+        if not text:
+            self.rider_fee_enc = None
+        else:
+            self.rider_fee_enc = encrypt_field(text.encode("utf-8"))
 
 
 class ContentGrant(db.Model):
@@ -206,13 +295,30 @@ class AccessLog(db.Model):
     user_id = db.Column(db.String(36), db.ForeignKey("users.id"), nullable=True, index=True)
     action = db.Column(db.Text, nullable=False)
     outcome = db.Column(db.Text, nullable=False)
-    ip_address = db.Column(db.Text)
+    ip_enc = db.Column(db.LargeBinary)
     user_agent = db.Column(db.Text)
     deny_reason = db.Column(db.Text)
     at = db.Column(db.DateTime(timezone=True), nullable=False, default=_now)
 
     content_item = db.relationship("ContentItem")
     user = db.relationship("User")
+
+    @property
+    def ip_address(self):
+        from app.crypto import decrypt_field
+
+        if not self.ip_enc:
+            return None
+        return decrypt_field(self.ip_enc).decode("utf-8")
+
+    @ip_address.setter
+    def ip_address(self, value):
+        from app.crypto import encrypt_field
+
+        if value is None:
+            self.ip_enc = None
+        else:
+            self.ip_enc = encrypt_field(str(value).encode("utf-8"))
 
 
 # Public-facing label sections (dashboard grouping). Audience still controls who sees each item.

@@ -180,10 +180,10 @@ def log_access(db, user, item, action, allowed, deny_reason, request):
         user_id=user.id if user else None,
         action=action,
         outcome="allowed" if allowed else "denied",
-        ip_address=request.remote_addr if request else None,
         user_agent=(request.headers.get("User-Agent") if request else None),
         deny_reason=deny_reason,
     )
+    entry.ip_address = request.remote_addr if request else None
     db.session.add(entry)
     db.session.commit()
     return entry

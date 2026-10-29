@@ -88,6 +88,8 @@
       <option value="">—</option>
       {% for b in bands %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
     </select>
+    <label>Contact details (encrypted)</label>
+    <input type="text" name="contact_details" value="{{ u.contact_details or '' }}" placeholder="phone / address (optional)">
     <label>Remove membership id</label>
     <select name="remove_membership">
       <option value="">—</option>

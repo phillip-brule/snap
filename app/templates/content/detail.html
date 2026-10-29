@@ -37,6 +37,12 @@
   {% if item.available_from_fans %}
   <p class="muted">Fans available from: {{ item.available_from_fans }}</p>
   {% endif %}
+  {% if item.contract_amount %}
+  <p class="muted">Contract amount: {{ item.contract_amount }}</p>
+  {% endif %}
+  {% if item.rider_fee %}
+  <p class="muted">Tour rider fee: {{ item.rider_fee }}</p>
+  {% endif %}
 
   {% if caps.stream %}
   <div class="media-stage">

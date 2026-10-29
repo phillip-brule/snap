@@ -74,13 +74,13 @@ def invite():
         inv = Invitation(
             label_id=label.id,
             invited_by_user_id=current_user.id,
-            email=email,
             intended_role=role,
             band_id=band_id,
             token_hash=hashlib.sha256(token.encode()).hexdigest(),
             status="pending",
             expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         )
+        inv.email = email
         db.session.add(inv)
         db.session.commit()
         link = url_for("auth.accept_invite", token=token, _external=True)
@@ -98,6 +98,8 @@ def update_user(user_id):
         user.status = status
     if request.form.get("verify"):
         user.email_verified = True
+    if "contact_details" in request.form:
+        user.contact_details = request.form.get("contact_details")
 
     role = request.form.get("add_role")
     band_id = request.form.get("band_id") or None
