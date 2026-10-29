@@ -1,0 +1,444 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  SNAP Records content access policy (XACML 3.0), evaluated by AuthzForce.
+  Mirrors docs/ACCESS_CONTROL.md. Rules are first-applicable: order matters.
+  Every Deny carries an advice "urn:snap:advice:deny" with the deny reason shown in the access log.
+
+  Request attributes (built by app/xacml.py):
+    subject      subject-id, urn:snap:subject:status, role (bag, roles for the item's band),
+                 urn:snap:subject:granted-action (bag, actions with an active grant on this item)
+    resource     resource-id, urn:snap:resource:band-id, :category, :audience-level,
+                 :is-deleted, :is-public, :available-from-press, :available-from-fans (optional)
+    action       action-id (view | stream | download | manage)
+    environment  current-dateTime
+
+  IMPORTANT: bump Version below whenever this file changes, otherwise AuthzForce keeps the old one.
+-->
+<PolicySet xmlns="urn:oasis:names:tc:xacml:3.0:core:schema:wd-17"
+           PolicySetId="snap-root" Version="1.0"
+           PolicyCombiningAlgId="urn:oasis:names:tc:xacml:3.0:policy-combining-algorithm:deny-unless-permit">
+  <Description>SNAP Records root policy set</Description>
+  <Target/>
+
+  <Policy PolicyId="snap-content-access" Version="1.0"
+          RuleCombiningAlgId="urn:oasis:names:tc:xacml:1.0:rule-combining-algorithm:first-applicable">
+    <Description>Access to band content items (view, stream, download, manage)</Description>
+    <Target/>
+
+    <!-- Item is public: is_public flag or audience level "public" -->
+    <VariableDefinition VariableId="is-public-item">
+      <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:or">
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:boolean-is-in">
+          <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#boolean">true</AttributeValue>
+          <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                               AttributeId="urn:snap:resource:is-public"
+                               DataType="http://www.w3.org/2001/XMLSchema#boolean" MustBePresent="false"/>
+        </Apply>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-is-in">
+          <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">public</AttributeValue>
+          <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                               AttributeId="urn:snap:resource:audience-level"
+                               DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+        </Apply>
+      </Apply>
+    </VariableDefinition>
+
+    <!-- Press-tier item: public or audience level "press" -->
+    <VariableDefinition VariableId="press-tier">
+      <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:or">
+        <VariableReference VariableId="is-public-item"/>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-is-in">
+          <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">press</AttributeValue>
+          <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                               AttributeId="urn:snap:resource:audience-level"
+                               DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+        </Apply>
+      </Apply>
+    </VariableDefinition>
+
+    <!-- Fan-tier item: public or audience level "fan_club" -->
+    <VariableDefinition VariableId="fan-tier">
+      <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:or">
+        <VariableReference VariableId="is-public-item"/>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-is-in">
+          <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">fan_club</AttributeValue>
+          <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                               AttributeId="urn:snap:resource:audience-level"
+                               DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+        </Apply>
+      </Apply>
+    </VariableDefinition>
+
+    <!-- Embargo (environment): now < available-from date. No date set means no embargo (empty bag). -->
+    <VariableDefinition VariableId="press-embargoed">
+      <Apply FunctionId="urn:oasis:names:tc:xacml:3.0:function:any-of">
+        <Function FunctionId="urn:oasis:names:tc:xacml:1.0:function:dateTime-less-than"/>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:dateTime-one-and-only">
+          <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:environment"
+                               AttributeId="urn:oasis:names:tc:xacml:1.0:environment:current-dateTime"
+                               DataType="http://www.w3.org/2001/XMLSchema#dateTime" MustBePresent="true"/>
+        </Apply>
+        <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                             AttributeId="urn:snap:resource:available-from-press"
+                             DataType="http://www.w3.org/2001/XMLSchema#dateTime" MustBePresent="false"/>
+      </Apply>
+    </VariableDefinition>
+
+    <VariableDefinition VariableId="fan-embargoed">
+      <Apply FunctionId="urn:oasis:names:tc:xacml:3.0:function:any-of">
+        <Function FunctionId="urn:oasis:names:tc:xacml:1.0:function:dateTime-less-than"/>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:dateTime-one-and-only">
+          <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:environment"
+                               AttributeId="urn:oasis:names:tc:xacml:1.0:environment:current-dateTime"
+                               DataType="http://www.w3.org/2001/XMLSchema#dateTime" MustBePresent="true"/>
+        </Apply>
+        <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                             AttributeId="urn:snap:resource:available-from-fans"
+                             DataType="http://www.w3.org/2001/XMLSchema#dateTime" MustBePresent="false"/>
+      </Apply>
+    </VariableDefinition>
+
+    <!-- 1. Only active accounts -->
+    <Rule RuleId="deny-inactive-subject" Effect="Deny">
+      <Condition>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:not">
+          <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-is-in">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">active</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:snap:subject:status"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Apply>
+        </Apply>
+      </Condition>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">unauthenticated</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <!-- 2. Soft-deleted items are never served -->
+    <Rule RuleId="deny-deleted" Effect="Deny">
+      <Condition>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:boolean-is-in">
+          <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#boolean">true</AttributeValue>
+          <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                               AttributeId="urn:snap:resource:is-deleted"
+                               DataType="http://www.w3.org/2001/XMLSchema#boolean" MustBePresent="false"/>
+        </Apply>
+      </Condition>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">deleted</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <!-- 3. Explicit, active grant for this (user, item, action) -->
+    <Rule RuleId="permit-explicit-grant" Effect="Permit">
+      <Condition>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-is-in">
+          <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-one-and-only">
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:action"
+                                 AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="true"/>
+          </Apply>
+          <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                               AttributeId="urn:snap:subject:granted-action"
+                               DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+        </Apply>
+      </Condition>
+    </Rule>
+
+    <!-- 4. Administrators cannot open band content without a grant (unless also a band member) -->
+    <Rule RuleId="deny-admin-without-grant" Effect="Deny">
+      <Condition>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:and">
+          <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-is-in">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">administrator</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Apply>
+          <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:not">
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-is-in">
+              <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">band_member</AttributeValue>
+              <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                   AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                   DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+            </Apply>
+          </Apply>
+        </Apply>
+      </Condition>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">admin_needs_grant</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <!-- 5. Band members own their band's catalogue: every action -->
+    <Rule RuleId="permit-band-member" Effect="Permit">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">band_member</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+    </Rule>
+
+    <!-- 6. Nobody else may manage content -->
+    <Rule RuleId="deny-manage" Effect="Deny">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">manage</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:action"
+                                 AttributeId="urn:oasis:names:tc:xacml:1.0:action:action-id"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="true"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">role</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <!-- 7-8. Crew / management: crew-level and public items -->
+    <Rule RuleId="permit-crew" Effect="Permit">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">crew</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <Condition>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:or">
+          <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:boolean-is-in">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#boolean">true</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                                 AttributeId="urn:snap:resource:is-public"
+                                 DataType="http://www.w3.org/2001/XMLSchema#boolean" MustBePresent="false"/>
+          </Apply>
+          <Apply FunctionId="urn:oasis:names:tc:xacml:3.0:function:any-of-any">
+            <Function FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-equal"/>
+            <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:string-bag">
+              <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">crew</AttributeValue>
+              <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">public</AttributeValue>
+            </Apply>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                                 AttributeId="urn:snap:resource:audience-level"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Apply>
+        </Apply>
+      </Condition>
+    </Rule>
+
+    <Rule RuleId="deny-crew-other" Effect="Deny">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">crew</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">role</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <!-- 9-11. Press / partners: press-level and public items, only after the press embargo date -->
+    <Rule RuleId="permit-press-after-embargo" Effect="Permit">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">press</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <Condition>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:and">
+          <VariableReference VariableId="press-tier"/>
+          <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:not">
+            <VariableReference VariableId="press-embargoed"/>
+          </Apply>
+        </Apply>
+      </Condition>
+    </Rule>
+
+    <Rule RuleId="deny-press-embargo" Effect="Deny">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">press</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <Condition>
+        <VariableReference VariableId="press-tier"/>
+      </Condition>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">embargo</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <Rule RuleId="deny-press-other" Effect="Deny">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">press</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">role</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <!-- 12-14. Fan club: fan-club-level and public items, only after the fan release date -->
+    <Rule RuleId="permit-fan-club-after-embargo" Effect="Permit">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">fan_club</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <Condition>
+        <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:and">
+          <VariableReference VariableId="fan-tier"/>
+          <Apply FunctionId="urn:oasis:names:tc:xacml:1.0:function:not">
+            <VariableReference VariableId="fan-embargoed"/>
+          </Apply>
+        </Apply>
+      </Condition>
+    </Rule>
+
+    <Rule RuleId="deny-fan-club-embargo" Effect="Deny">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">fan_club</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <Condition>
+        <VariableReference VariableId="fan-tier"/>
+      </Condition>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">embargo</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <Rule RuleId="deny-fan-club-other" Effect="Deny">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">fan_club</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:1.0:subject-category:access-subject"
+                                 AttributeId="urn:oasis:names:tc:xacml:2.0:subject:role"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">role</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <!-- 15. Any authenticated user (registered and above): public content -->
+    <Rule RuleId="permit-public" Effect="Permit">
+      <Condition>
+        <VariableReference VariableId="is-public-item"/>
+      </Condition>
+    </Rule>
+
+    <!-- 16. Restricted items: explicit grants only -->
+    <Rule RuleId="deny-restricted" Effect="Deny">
+      <Target>
+        <AnyOf><AllOf>
+          <Match MatchId="urn:oasis:names:tc:xacml:1.0:function:string-equal">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">restricted</AttributeValue>
+            <AttributeDesignator Category="urn:oasis:names:tc:xacml:3.0:attribute-category:resource"
+                                 AttributeId="urn:snap:resource:audience-level"
+                                 DataType="http://www.w3.org/2001/XMLSchema#string" MustBePresent="false"/>
+          </Match>
+        </AllOf></AnyOf>
+      </Target>
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">restricted</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+
+    <!-- 17. Default deny -->
+    <Rule RuleId="deny-default" Effect="Deny">
+      <AdviceExpressions>
+        <AdviceExpression AdviceId="urn:snap:advice:deny" AppliesTo="Deny">
+          <AttributeAssignmentExpression AttributeId="urn:snap:advice:deny-reason">
+            <AttributeValue DataType="http://www.w3.org/2001/XMLSchema#string">role</AttributeValue>
+          </AttributeAssignmentExpression>
+        </AdviceExpression>
+      </AdviceExpressions>
+    </Rule>
+  </Policy>
+</PolicySet>

@@ -91,6 +91,13 @@ def create_app():
         },
     )
 
+    # Access control: XACML 3.0 PDP (AuthzForce). Unset -> local Python rules (dev/tests only).
+    authzforce_url = os.getenv("AUTHZFORCE_URL")
+    if authzforce_url:
+        from app import xacml
+
+        xacml.init_pdp(authzforce_url)
+
     # Register blueprints
     from app.routes.auth import bp as auth_bp
     from app.routes.dashboard import bp as dashboard_bp
