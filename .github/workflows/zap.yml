@@ -1,0 +1,56 @@
+# OWASP ZAP baseline against the running SNAP stack (nginx HTTPS).
+name: zap
+
+on:
+  push:
+    branches: [main, phillip]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  zap:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Generate local secrets for CI
+        run: |
+          mkdir -p secrets certs
+          openssl rand -out secrets/content_kek 32
+          openssl req -x509 -newkey rsa:2048 -nodes \
+            -keyout secrets/server.key \
+            -out certs/fullchain.crt \
+            -days 1 -subj "/CN=localhost"
+          chmod 600 secrets/content_kek secrets/server.key
+
+      - name: Start stack
+        env:
+          FLASK_SECRET_KEY: ci-flask-secret
+          GOOGLE_CLIENT_ID: ci-unused.apps.googleusercontent.com
+          GOOGLE_CLIENT_SECRET: ci-unused-secret
+        run: |
+          docker compose up -d --build
+          # wait until login responds (self-signed TLS)
+          for i in $(seq 1 60); do
+            if curl -skf https://localhost/login >/dev/null; then
+              echo "app up"
+              exit 0
+            fi
+            sleep 2
+          done
+          docker compose logs
+          exit 1
+
+      - name: ZAP baseline scan
+        uses: zaproxy/action-baseline@v0.14.0
+        with:
+          target: "https://localhost"
+          # self-signed cert from CI step above
+          cmd_options: "-config network.connection.timeoutInSecs=60"
+          allow_issue_writing: false
+          fail_action: false
+          artifact_name: zap-baseline
+
+      - name: Stop stack
+        if: always()
+        run: docker compose down -v
