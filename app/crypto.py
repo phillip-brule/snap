@@ -28,25 +28,30 @@ def set_kek(kek_path):
     _blind_key = hmac.new(_master, b"snap-records/blind-index", hashlib.sha256).digest()
 
 
-def _seal(key, plaintext):
+def _seal(key, plaintext, aad=b""):
     cipher = AES.new(key, AES.MODE_GCM)
+    if aad:
+        cipher.update(aad)
     ciphertext, tag = cipher.encrypt_and_digest(plaintext)
     return cipher.nonce + tag + ciphertext
 
 
-def _unseal(key, sealed):
+def _unseal(key, sealed, aad=b""):
     nonce = sealed[:16]
     tag = sealed[16:32]
     ciphertext = sealed[32:]
     cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
+    if aad:
+        cipher.update(aad)
     return cipher.decrypt_and_verify(ciphertext, tag)
 
 
 def encrypt_data(data):
+    """Partial encrypt (prefix only) + full-file auth (tail bound as GCM AAD)."""
     dek = get_random_bytes(32)
     prefix = data[:PREFIX_LEN]
     tail = data[PREFIX_LEN:]
-    sealed_prefix = _seal(dek, prefix)
+    sealed_prefix = _seal(dek, prefix, aad=tail)
     wrapped_dek = _seal(_file_kek, dek)
     return sealed_prefix + tail, wrapped_dek
 
@@ -57,7 +62,7 @@ def decrypt_data(encrypted_data, wrapped_dek):
         return _unseal(dek, encrypted_data)
     sealed = encrypted_data[:SEALED_PREFIX_LEN]
     tail = encrypted_data[SEALED_PREFIX_LEN:]
-    prefix = _unseal(dek, sealed)
+    prefix = _unseal(dek, sealed, aad=tail)
     return prefix + tail
 
 
