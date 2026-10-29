@@ -6,7 +6,6 @@ docker compose up -d --build
 
 Open [http://localhost:5000](http://localhost:5000)
 
-
 | Email                 | Password     |
 | --------------------- | ------------ |
 | `admin@snap.records`  | `admin123`   |
@@ -16,9 +15,8 @@ Open [http://localhost:5000](http://localhost:5000)
 | `fanclub@example.com` | `fanclub123` |
 | `fan@example.com`     | `fan123`     |
 
-
 ```bash
-docker compose down
+docker compose down -v --remove-orphans //for db reset
 ```
 
 Follow logs:
