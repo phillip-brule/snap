@@ -1,7 +1,14 @@
-"""Functional can_access — XACML/AuthzForce deferred to security phase."""
+"""Content authorization facade.
+
+can_access() is the single entry point used by every page. With AUTHZFORCE_URL set
+(docker compose), the decision is taken by the AuthzForce XACML 3.0 PDP using
+authz/snap-policy.xml; this module only gathers the attributes (PIP role).
+Without it (local `python run.py`, unit tests) the equivalent Python rules below are used.
+"""
 
 from datetime import datetime, timezone
 
+from app import xacml
 from app.models import CREW_CATEGORIES, ContentGrant
 
 
@@ -50,9 +57,50 @@ def _fan_window_ok(item, now):
     return aff is None or now >= aff
 
 
+def _granted_actions(user, item, now):
+    return {
+        action
+        for action in {g.action for g in item.grants if g.user_id == user.id}
+        if _active_grant(user, item, action, now)
+    }
+
+
+def _xacml_attributes(user, item, now):
+    subject = {
+        "id": user.id,
+        "status": user.status,
+        "roles": _roles(user, item.band_id),
+        "granted_actions": _granted_actions(user, item, now),
+    }
+    resource = {
+        "id": item.id,
+        "band_id": item.band_id,
+        "category": item.category,
+        "audience_level": item.audience_level,
+        "is_deleted": item.is_deleted,
+        "is_public": item.is_public,
+        "available_from_press": _aware(item.available_from_press),
+        "available_from_fans": _aware(item.available_from_fans),
+    }
+    return subject, resource
+
+
 def can_access(user, item, action):
     """Return (allowed: bool, deny_reason: str|None)."""
-    if user is None or user.status != "active":
+    if user is None or getattr(user, "is_anonymous", False):
+        return False, "unauthenticated"
+
+    if xacml.is_enabled():
+        now = _now()
+        subject, resource = _xacml_attributes(user, item, now)
+        return xacml.evaluate(subject, resource, action, now)
+
+    return local_can_access(user, item, action)
+
+
+def local_can_access(user, item, action):
+    """Reference implementation of authz/snap-policy.xml (local dev and tests)."""
+    if user.status != "active":
         return False, "unauthenticated"
 
     if item.is_deleted:

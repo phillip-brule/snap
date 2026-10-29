@@ -19,6 +19,17 @@ services:
       timeout: 3s
       retries: 10
 
+  # XACML 3.0 PDP/PAP. Internal network only: its REST API (incl. policy admin) is unauthenticated.
+  authzforce:
+    image: authzforce/server:12.1.0
+    expose:
+      - "8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf -o /dev/null http://localhost:8080/authzforce-ce/domains"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+
   nginx:
     image: nginx:1.27-alpine
     ports:
@@ -47,6 +58,8 @@ services:
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:?Set GOOGLE_CLIENT_SECRET in .env}
       # Content encryption
       CONTENT_KEK_PATH: /run/secrets/content_kek
+      # Access control (XACML 3.0 PDP)
+      AUTHZFORCE_URL: http://authzforce:8080
     secrets:
       - content_kek
 
@@ -54,9 +67,12 @@ services:
     volumes:
       - uploads:/data/uploads
       - ./app:/app/app
+      - ./authz:/app/authz:ro
 
     depends_on:
       db:
+        condition: service_healthy
+      authzforce:
         condition: service_healthy
 
 volumes:

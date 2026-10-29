@@ -6,7 +6,7 @@ SNAP Records is planned as a small containerized web stack. **Design phase only*
 
 **In scope when building:** Nginx (optional early; required for TLS later), Flask app, PostgreSQL, file volume.
 
-**Deferred:** AuthzForce (XACML), Docker secrets for crypto keys, OAuth IdP, encryption services.
+**Access control:** AuthzForce XACML 3.0 PDP (see [ACCESS_CONTROL.md](ACCESS_CONTROL.md)).
 
 ## Component diagram
 
@@ -30,8 +30,11 @@ flowchart TB
     Vol[File_volume]
   end
 
+  subgraph authz [Access_control]
+    Authz[AuthzForce_XACML_PDP]
+  end
+
   subgraph deferred [Deferred_security]
-    Authz[AuthzForce_XACML]
     Secrets[Docker_secrets]
     OAuth[OAuth_OIDC_IdP]
   end
@@ -41,7 +44,7 @@ flowchart TB
   Flask --> Policy
   Flask --> PG
   Flask --> Vol
-  Policy -.->|later| Authz
+  Policy -->|XACML| Authz
   Flask -.->|later| Secrets
   Flask -.->|later| OAuth
 ```
@@ -52,10 +55,10 @@ flowchart TB
 |-----------|----------------|
 | Nginx | Terminate TLS with a certificate signed by the SNAP Root CA (`certs_gen.sh`), redirect HTTP→HTTPS, HSTS and security headers, forward HTTP to Flask |
 | Flask | Pages, forms, session auth, upload/download, permission UI, access logging, in-app authorization |
-| `can_access` | Single policy entrypoint: role + membership + audience + time windows + grants. Later: call XACML PDP |
+| `can_access` | Single policy entrypoint (PEP/PIP): gathers role, membership, audience, time window and grant attributes and asks the XACML PDP |
 | PostgreSQL | Label, bands, users, memberships, invitations, content metadata, grants, access logs. Later: wrapped file keys, encrypted fields |
 | File volume | Stored content blobs. Later: ciphertext only |
-| AuthzForce | Deferred PDP/PAP for XACML 3.0 decisions |
+| AuthzForce | XACML 3.0 PDP/PAP evaluating `authz/snap-policy.xml`; internal network only |
 | Docker secrets | Deferred master keys, DB credentials, OAuth client secret |
 | OAuth / OIDC | Deferred fan Google login |
 
@@ -109,7 +112,7 @@ flowchart LR
   DMZ -->|HTTP_internal| App[Flask]
   App --> DB[(PostgreSQL)]
   App --> Files[Volume]
-  App -.->|deferred| PDP[AuthzForce]
+  App -->|XACML_request| PDP[AuthzForce]
 ```
 
 Until Phase 3, treat the app as a local/dev service with simple auth. Do not claim production-hardening.

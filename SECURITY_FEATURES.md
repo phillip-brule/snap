@@ -128,6 +128,26 @@ If changes are not applied, rebuild the web container:
 docker compose up -d --build web
 ```
 
+## 5b. Access Control with XACML 3.0 (AuthzForce)
+
+Every view / stream / download / manage decision on content is taken by the AuthzForce XACML 3.0 PDP
+(`authzforce` service) using `authz/snap-policy.xml`. The web container creates the `snap-records`
+domain and uploads the policy on startup (look for `authz: XACML PDP at ...` in `docker compose logs web`).
+
+**Testing:**
+
+1. Sign in as `fan@example.com` — only public items are listed.
+2. Sign in as `fanclub@example.com` — public + fan club items whose fan release date has passed.
+3. Open a press/band item URL as a fan → 403; the access log shows the deny reason returned by the policy.
+4. `docker compose stop authzforce` → every content request is denied (`pdp_unavailable`): the app fails closed.
+5. Automated parity test (AuthzForce vs documented rules):
+
+```bash
+docker compose run --rm -e AUTHZFORCE_URL=http://authzforce:8080 web sh -c "pip install -q pytest && python -m pytest tests"
+```
+
+Details: `docs/ACCESS_CONTROL.md`.
+
 ## 6. Security Notes
 
 - Never commit `.env`, Google Client Secrets, or Flask secret keys.
@@ -150,5 +170,9 @@ docker compose up -d --build web
 | `app/templates/auth/login.html` | Google login button |
 | `docker-compose.yml` | Environment configuration |
 | `requirements.txt` | Python dependencies |
+| `authz/snap-policy.xml` | XACML 3.0 content access policy |
+| `app/xacml.py` | AuthzForce client: domain/policy bootstrap, XACML request/response |
+| `app/policy.py` | `can_access` PEP/PIP facade |
+| `tests/test_xacml.py` | XACML request/response and policy parity tests |
 
-**Implemented features:** Google OAuth / OpenID Connect and Recipient Watermarking with PostgreSQL Audit Trail.
+**Implemented features:** Google OAuth / OpenID Connect, Recipient Watermarking with PostgreSQL Audit Trail, and Access Control with XACML 3.0 (AuthzForce).

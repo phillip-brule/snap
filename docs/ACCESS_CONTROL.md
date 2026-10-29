@@ -1,6 +1,6 @@
-# Access control (functional)
+# Access control (XACML 3.0)
 
-Authorization is **application-enforced** in Phase 2 via a single policy surface. XACML / AuthzForce is **deferred** to Phase 3 and should replace or wrap the same surface without rewriting page controllers.
+Content authorization decisions are taken by an **AuthzForce XACML 3.0 PDP** (`authzforce` service in `docker-compose.yml`) using the policy in [`authz/snap-policy.xml`](../authz/snap-policy.xml). Pages call one facade, `can_access`, which builds the XACML request, sends it to AuthzForce and enforces the decision. The rules below are what the policy implements.
 
 ## Policy surface
 
@@ -145,20 +145,53 @@ Grants can open access early for a journalist, extend download rights, or give a
 | Denied attempt | `outcome = denied`, set `deny_reason` (e.g. `embargo`, `role`, `restricted`, `deleted`) |
 | Manage actions | Optional but recommended |
 
-## Deferred: XACML 3.0 / AuthzForce
+## XACML 3.0 / AuthzForce implementation
 
-Phase 3 may map:
+| XACML role | Component |
+|------------|-----------|
+| PEP (enforcement) | Flask routes via `can_access` (`app/policy.py`): 403 + access log on Deny |
+| PIP (attributes) | `app/policy.py::_xacml_attributes` reads memberships, grants and item metadata from PostgreSQL |
+| PDP (decision) | AuthzForce `POST /authzforce-ce/domains/{id}/pdp` |
+| PAP (policy admin) | AuthzForce REST API; `app/xacml.py::init_pdp` creates the `snap-records` domain and loads the policy at startup |
 
-| XACML attribute | Source |
-|-----------------|--------|
-| Subject | user id, roles, account_type |
-| Resource | content id, band, category, audience_level |
-| Action | view/stream/download/manage |
-| Environment | current time vs availability windows |
+### Request attributes
 
-Flask would build a request, call AuthzForce, and keep the same `can_access` facade so pages do not change.
+| Category | AttributeId | Type | Source |
+|----------|-------------|------|--------|
+| Subject | `urn:oasis:names:tc:xacml:1.0:subject:subject-id` | string | user id |
+| Subject | `urn:snap:subject:status` | string | `active` / `pending` / `disabled` |
+| Subject | `urn:oasis:names:tc:xacml:2.0:subject:role` | string bag | memberships for the item's band (+ `administrator`) |
+| Subject | `urn:snap:subject:granted-action` | string bag | actions with an active, non-revoked grant on this item |
+| Resource | `urn:oasis:names:tc:xacml:1.0:resource:resource-id` | string | content item id |
+| Resource | `urn:snap:resource:band-id`, `:category`, `:audience-level` | string | content item |
+| Resource | `urn:snap:resource:is-deleted`, `:is-public` | boolean | content item |
+| Resource | `urn:snap:resource:available-from-press`, `:available-from-fans` | dateTime | embargo dates (absent = no embargo) |
+| Action | `urn:oasis:names:tc:xacml:1.0:action:action-id` | string | `view` / `stream` / `download` / `manage` |
+| Environment | `urn:oasis:names:tc:xacml:1.0:environment:current-dateTime` | dateTime | request time (embargo check is done in the policy) |
 
-Until then: implement rules in Python (or SQL predicates) only. Do not stand up AuthzForce.
+### Policy
+
+`snap-root` PolicySet (deny-unless-permit) → `snap-content-access` Policy (first-applicable), one rule per line of the decision order above. Every Deny rule returns the advice `urn:snap:advice:deny` with a `deny-reason` (`embargo`, `role`, `restricted`, `deleted`, `admin_needs_grant`, `unauthenticated`) that is written to `access_logs`.
+
+**Changing the policy:** edit `authz/snap-policy.xml`, bump `Version` on the `PolicySet`, restart `web`. The app uploads the new version and pins the PDP to it.
+
+### Fail closed
+
+`NotApplicable`, `Indeterminate`, timeouts or an unreachable PDP are all treated as **Deny** (`pdp_unavailable` / `pdp_indeterminate` in the access log).
+
+### Security of the PDP
+
+AuthzForce's REST API (including the PAP that can replace policies) has no authentication, so the container is only on the internal compose network: no host port is published.
+
+### Local development and tests
+
+Without `AUTHZFORCE_URL` (e.g. `python run.py`), `can_access` falls back to `local_can_access`, a Python reference implementation of the same rules. `tests/test_xacml.py` checks that AuthzForce and the reference give identical decisions and deny reasons over ~2,900 combinations of role, audience, action, embargo, grant, deletion and account status:
+
+```bash
+docker compose run --rm -e AUTHZFORCE_URL=http://authzforce:8080 web sh -c "pip install -q pytest && python -m pytest tests"
+```
+
+Only content decisions go through XACML; admin panel, upload and access-log page checks (`can_admin`, `can_upload`, `can_view_logs`) stay in Python.
 
 ## Related docs
 
