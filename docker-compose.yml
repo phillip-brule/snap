@@ -51,6 +51,8 @@ services:
     environment:
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY:?Set FLASK_SECRET_KEY in .env}
       BEHIND_PROXY: "1"
+      # served only over HTTPS (nginx): session cookies must carry the Secure flag
+      SESSION_COOKIE_SECURE: "1"
       DATABASE_URL: postgresql+psycopg2://snap:snap@db:5432/snap_records
       UPLOAD_FOLDER: /data/uploads
       # Google OAuth / OpenID Connect

@@ -18,7 +18,7 @@ docker compose ps
 
 Open the application at:
 
-http://localhost:5000
+https://localhost (trust `certs/snap-root-ca.crt` first, see README)
 
 To inspect application logs:
 
@@ -41,7 +41,7 @@ FLASK_SECRET_KEY=your_random_secret_key
 Configure the following authorized redirect URI in Google Cloud Console:
 
 ```text
-http://localhost:5000/auth/google/callback
+https://localhost/auth/google/callback
 ```
 
 Restart the application after updating the configuration:
@@ -52,7 +52,7 @@ docker compose up -d --force-recreate web
 
 **Testing:**
 
-1. Open http://localhost:5000.
+1. Open https://localhost.
 2. Click **Continue with Google** on the login page.
 3. Sign in with an authorized Google account.
 4. New Google users should receive the `registered` role by default.
