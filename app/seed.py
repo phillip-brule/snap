@@ -198,13 +198,19 @@ def seed():
                 band_id=band.id,
                 uploaded_by_user_id=member.id,
                 title=s["title"],
+                description=s.get("description") or (s.get("body") or "").strip() or None,
+                category=s["category"],
+                audience_level=s["audience_level"],
+                is_public=s.get("is_public", False),
+                available_from_press=s.get("available_from_press"),
+                available_from_fans=s.get("available_from_fans"),
                 storage_path="pending",
             )
             db.session.add(item)
             db.session.flush()
 
         item.uploaded_by_user_id = member.id
-        item.description = s.get("description") or (s.get("body") or "").strip()
+        item.description = s.get("description") or (s.get("body") or "").strip() or None
         item.category = s["category"]
         item.audience_level = s["audience_level"]
         item.is_public = s.get("is_public", False)
