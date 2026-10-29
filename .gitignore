@@ -12,3 +12,4 @@ docs/AGENT.md
 docs/PLAN.md
 secrets/
 certs/
+.zap/report/

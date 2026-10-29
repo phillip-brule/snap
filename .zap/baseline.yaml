@@ -1,0 +1,81 @@
+# OWASP ZAP Automation Framework plan: baseline (passive) scan, run on every push.
+# Crawls https://localhost anonymously and as a logged-in fan, and analyses every response
+# without attacking it.
+#
+# Run locally against a running stack (docker compose up):
+#   docker run --rm --network host -v "$PWD/.zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:2.16.1 \
+#     zap.sh -cmd -autorun /zap/wrk/baseline.yaml
+env:
+  contexts:
+    - name: snap
+      urls:
+        - https://localhost
+      includePaths:
+        - "https://localhost.*"
+      excludePaths:
+        - "https://localhost/logout.*"       # would end the authenticated session
+        - "https://localhost/auth/google.*"  # redirects to Google (out of scope)
+      authentication:
+        method: form
+        parameters:
+          loginPageUrl: https://localhost/login
+          loginRequestUrl: https://localhost/login
+          loginRequestBody: "email={%username%}&password={%password%}"
+        verification:
+          method: response
+          loggedInRegex: "\\QLog out\\E"
+          loggedOutRegex: "\\Qname=\"password\"\\E"
+      sessionManagement:
+        method: cookie
+      users:
+        - name: fan
+          credentials:
+            username: fan@example.com   # seeded test account (app/seed.py), CI only
+            password: fan123
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+  # 1. What can an anonymous visitor reach?
+  - type: spider
+    name: spider-anonymous
+    parameters:
+      context: snap
+      maxDuration: 2
+      postForm: false     # don't submit register/login forms (rate limits, junk users)
+
+  # 2. What does a logged-in fan see?
+  - type: spider
+    name: spider-authenticated
+    parameters:
+      context: snap
+      user: fan
+      maxDuration: 3
+      postForm: false
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk/report
+      reportFile: zap-report.html
+      reportTitle: "SNAP Records - ZAP baseline scan"
+    risks: [high, medium, low, info]
+
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/report
+      reportFile: zap-report.json
+    risks: [high, medium, low, info]
+
+  # Fail the pipeline on any High or Medium alert that is not filtered as accepted risk.
+  - type: exitStatus
+    parameters:
+      errorLevel: Medium
+      warnLevel: Low
