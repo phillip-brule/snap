@@ -64,12 +64,8 @@ def create_app():
     app.config["UPLOAD_FOLDER"] = str(upload)
     app.config["MAX_CONTENT_LENGTH"] = 100 * 1024 * 1024
     app.config["CONTENT_KEK_PATH"] = os.getenv("CONTENT_KEK_PATH", "/run/secrets/content_kek")
-    app.config.update(
-        SESSION_COOKIE_HTTPONLY=True,
-        SESSION_COOKIE_SAMESITE="Lax",
-        SESSION_COOKIE_SECURE=os.getenv("SESSION_COOKIE_SECURE", "0") == "1",
-        RATELIMIT_STORAGE_URI="memory://",
-    )
+    # Cookie flags are set once, above (Secure by default).
+    app.config["RATELIMIT_STORAGE_URI"] = "memory://"
     set_kek(app.config["CONTENT_KEK_PATH"])
     db.init_app(app)
     login_manager.init_app(app)
