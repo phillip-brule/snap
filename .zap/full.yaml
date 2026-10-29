@@ -1,0 +1,90 @@
+# OWASP ZAP Automation Framework plan: FULL scan (passive + active attacks), run manually
+# from GitHub Actions ("Run workflow", scan = full). Same crawl as baseline.yaml, then ZAP
+# actively attacks every discovered URL/parameter as the logged-in fan (SQL injection, XSS,
+# path traversal, command injection, ...). Only ever run it against a throwaway stack.
+#
+# Run locally against a running stack (docker compose up):
+#   docker run --rm --network host -v "$PWD/.zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:2.16.1 \
+#     zap.sh -cmd -autorun /zap/wrk/full.yaml
+env:
+  contexts:
+    - name: snap
+      urls:
+        - https://localhost
+      includePaths:
+        - "https://localhost.*"
+      excludePaths:
+        - "https://localhost/logout.*"       # would end the authenticated session
+        - "https://localhost/auth/google.*"  # redirects to Google (out of scope)
+      authentication:
+        method: form
+        parameters:
+          loginPageUrl: https://localhost/login
+          loginRequestUrl: https://localhost/login
+          loginRequestBody: "email={%username%}&password={%password%}"
+        verification:
+          method: response
+          loggedInRegex: "\\QLog out\\E"
+          loggedOutRegex: "\\Qname=\"password\"\\E"
+      sessionManagement:
+        method: cookie
+      users:
+        - name: fan
+          credentials:
+            username: fan@example.com   # seeded test account (app/seed.py), CI only
+            password: fan123
+  parameters:
+    failOnError: true
+    failOnWarning: false
+    progressToStdout: true
+
+jobs:
+  # 1. What can an anonymous visitor reach?
+  - type: spider
+    name: spider-anonymous
+    parameters:
+      context: snap
+      maxDuration: 2
+      postForm: false     # don't submit register/login forms (rate limits, junk users)
+
+  # 2. What does a logged-in fan see?
+  - type: spider
+    name: spider-authenticated
+    parameters:
+      context: snap
+      user: fan
+      maxDuration: 3
+      postForm: false
+
+  - type: passiveScan-wait
+    parameters:
+      maxDuration: 5
+
+  # 3. Attack what was found, authenticated as the fan
+  - type: activeScan
+    parameters:
+      context: snap
+      user: fan
+      maxRuleDurationInMins: 2
+      maxScanDurationInMins: 20
+
+  - type: report
+    parameters:
+      template: traditional-html
+      reportDir: /zap/wrk/report
+      reportFile: zap-full-report.html
+      reportTitle: "SNAP Records - ZAP full scan"
+    risks: [high, medium, low, info]
+
+  - type: report
+    parameters:
+      template: traditional-json
+      reportDir: /zap/wrk/report
+      reportFile: zap-full-report.json
+    risks: [high, medium, low, info]
+
+  # Fail the pipeline on any High or Medium alert that is not filtered as accepted risk.
+  - type: exitStatus
+    parameters:
+      errorLevel: Medium
+      warnLevel: Low

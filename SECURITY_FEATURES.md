@@ -148,6 +148,21 @@ docker compose run --rm -e AUTHZFORCE_URL=http://authzforce:8080 web sh -c "pip 
 
 Details: `docs/ACCESS_CONTROL.md`.
 
+## 5c. CI Security Checks (GitHub Actions + OWASP ZAP)
+
+Every push / pull request runs `.github/workflows/security.yml`:
+
+1. **Gitleaks** scans the whole git history for private keys and secrets.
+2. **OWASP ZAP** scans the running application over HTTPS: the CI job starts the full stack, ZAP crawls
+   it anonymously and as the seeded fan (`fan@example.com`), passively checks every response and fails the
+   job on Medium/High alerts. Report: run summary + `zap-report` artifact.
+3. **Exposed routes** (`tests/test_exposed_routes.py`): every Flask route must redirect to login or
+   refuse anonymous requests, except an explicit public allowlist.
+
+**Testing:** push any commit and open the **Actions** tab. To see it catch a leak, commit a private key on a
+throwaway branch (`openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out oops.key`): the
+Gitleaks job fails with rule `private-key`. Remember to delete that branch afterwards.
+
 ## 6. Security Notes
 
 - Never commit `.env`, Google Client Secrets, or Flask secret keys.
@@ -174,5 +189,8 @@ Details: `docs/ACCESS_CONTROL.md`.
 | `app/xacml.py` | AuthzForce client: domain/policy bootstrap, XACML request/response |
 | `app/policy.py` | `can_access` PEP/PIP facade |
 | `tests/test_xacml.py` | XACML request/response and policy parity tests |
+| `.github/workflows/security.yml` | CI: Gitleaks + OWASP ZAP + exposed-routes check |
+| `.zap/baseline.yaml`, `.zap/full.yaml` | ZAP Automation Framework plans (passive / active) |
+| `tests/test_exposed_routes.py` | Fails if a route is reachable without login |
 
 **Implemented features:** Google OAuth / OpenID Connect, Recipient Watermarking with PostgreSQL Audit Trail, and Access Control with XACML 3.0 (AuthzForce).
