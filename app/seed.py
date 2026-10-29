@@ -1,13 +1,14 @@
+
 """Idempotent seed: SNAP Records, SNAP, sample users & content."""
 
 import mimetypes
-import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from flask import current_app
 
 from app.extensions import db
+from app.crypto import encrypt_data
 from app.models import Band, ContentItem, Label, Membership, User
 
 
@@ -20,7 +21,7 @@ SAMPLE_USERS = [
     ("fan@example.com", "Registered Fan", "fan", "registered", "snap", "fan123"),
 ]
 
-# Old Delivery-01 sample titles → remove so dashboard isn't confusing
+# Old Delivery-01 sample titles -> remove so dashboard isn't confusing
 LEGACY_SAMPLE_TITLES = [
     "SNAP — Demo reel",
     "Tour EU 2026 rider",
@@ -32,32 +33,33 @@ LEGACY_SAMPLE_TITLES = [
 MEDIA_DIR = Path(__file__).resolve().parent / "static" / "inspo" / "media"
 
 
-def _write_sample_file(folder: Path, name: str, text: str) -> Path:
+def _write_encrypted(folder: Path, name: str, plain: bytes) -> tuple[Path, bytes]:
     folder.mkdir(parents=True, exist_ok=True)
     path = folder / name
-    path.write_text(text)
-    return path
+    ciphertext, wrapped_dek = encrypt_data(plain)
+    path.write_bytes(ciphertext)
+    return path, wrapped_dek
 
 
-def _copy_media(folder: Path, media_name: str) -> Path | None:
+def _copy_media(folder: Path, media_name: str) -> tuple[Path, bytes] | None:
     src = MEDIA_DIR / media_name
+
     if not src.is_file():
         print(f"Seed warning: missing media {src}")
         return None
-    folder.mkdir(parents=True, exist_ok=True)
-    dest = folder / media_name
-    shutil.copy2(src, dest)
-    return dest
+    return _write_encrypted(folder, media_name, src.read_bytes())
 
 
 def seed():
     label = Label.query.filter_by(slug="snap-records").first()
+
     if not label:
         label = Label(name="SNAP Records", slug="snap-records")
         db.session.add(label)
         db.session.flush()
 
     band = Band.query.filter_by(slug="snap").first()
+
     if not band:
         band = Band(
             label_id=label.id,
@@ -69,29 +71,47 @@ def seed():
         db.session.flush()
 
     users_by_email = {}
+
     for email, name, acct, role, band_slug, password in SAMPLE_USERS:
-        user = User.query.filter_by(email=email).first()
+        user = User.find_by_email(email)
         if not user:
             user = User(
                 label_id=label.id,
-                email=email,
                 display_name=name,
                 account_type=acct,
                 status="active",
                 email_verified=True,
             )
+            user.email = email
             user.set_password(password)
             db.session.add(user)
             db.session.flush()
+
             bid = None if role == "administrator" else band.id
-            db.session.add(Membership(user_id=user.id, band_id=bid, role=role))
+
+            db.session.add(
+                Membership(
+                    user_id=user.id,
+                    band_id=bid,
+                    role=role,
+                )
+            )
+
         users_by_email[email] = user
 
     db.session.commit()
 
+    # Mark old sample content as deleted
     for title in LEGACY_SAMPLE_TITLES:
-        for old in ContentItem.query.filter_by(title=title, band_id=band.id, is_deleted=False).all():
+        old_items = ContentItem.query.filter_by(
+            title=title,
+            band_id=band.id,
+            is_deleted=False,
+        ).all()
+
+        for old in old_items:
             old.is_deleted = True
+
     db.session.commit()
 
     member = users_by_email["member@snap.band"]
@@ -187,13 +207,20 @@ def seed():
     ]
 
     for s in samples:
-        existing = ContentItem.query.filter_by(title=s["title"], band_id=band.id).first()
+        existing = ContentItem.query.filter_by(
+            title=s["title"],
+            band_id=band.id,
+        ).first()
+
         if existing and existing.is_deleted:
             item = existing
             item.is_deleted = False
+
         elif existing:
             item = existing
+
         else:
+            # FIX: Set required fields before db.session.flush()
             item = ContentItem(
                 band_id=band.id,
                 uploaded_by_user_id=member.id,
@@ -206,6 +233,7 @@ def seed():
                 available_from_fans=s.get("available_from_fans"),
                 storage_path="pending",
             )
+
             db.session.add(item)
             db.session.flush()
 
@@ -218,28 +246,43 @@ def seed():
         item.available_from_fans = s.get("available_from_fans")
 
         folder = upload_root / item.id
+
         if s.get("media"):
-            path = _copy_media(folder, s["media"])
-            if path:
+            copied = _copy_media(folder, s["media"])
+            if copied:
+                path, wrapped_dek = copied
                 item.storage_path = str(path)
                 item.original_filename = s["media"]
-                item.mime_type = mimetypes.guess_type(s["media"])[0] or "application/octet-stream"
+                item.mime_type = (
+                    mimetypes.guess_type(s["media"])[0]
+                    or "application/octet-stream"
+                )
                 item.size_bytes = path.stat().st_size
+                item.wrapped_dek = wrapped_dek
         else:
             fname = s.get("filename") or "note.txt"
-            path = _write_sample_file(folder, fname, s.get("body") or "")
+            path, wrapped_dek = _write_encrypted(
+                folder, fname, (s.get("body") or "").encode()
+            )
             item.storage_path = str(path)
             item.original_filename = fname
             item.mime_type = "text/plain"
             item.size_bytes = path.stat().st_size
+            item.wrapped_dek = wrapped_dek
 
     db.session.commit()
-    print("Seed complete. Sample logins: admin@snap.records / admin123, member@snap.band / member123, …")
+
+    print(
+        "Seed complete. Sample logins: "
+        "admin@snap.records / admin123, "
+        "member@snap.band / member123, …"
+    )
 
 
 if __name__ == "__main__":
     from app import create_app
 
     app = create_app()
+
     with app.app_context():
         seed()

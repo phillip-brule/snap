@@ -48,7 +48,8 @@ class User(UserMixin, db.Model):
 
     id = db.Column(db.String(36), primary_key=True, default=_uuid)
     label_id = db.Column(db.String(36), db.ForeignKey("labels.id"), nullable=False)
-    email = db.Column(db.Text, nullable=False, unique=True)
+    email_enc = db.Column(db.LargeBinary, nullable=False)
+    email_hash = db.Column(db.String(64), nullable=False, unique=True, index=True)
     display_name = db.Column(db.Text, nullable=False)
     account_type = db.Column(db.Text, nullable=False)  # professional | fan
     status = db.Column(db.Text, nullable=False, default="active")  # pending | active | disabled
@@ -63,6 +64,29 @@ class User(UserMixin, db.Model):
 
     label = db.relationship("Label", back_populates="users")
     memberships = db.relationship("Membership", back_populates="user", cascade="all, delete-orphan")
+
+    @property
+    def email(self):
+        from app.crypto import decrypt_field
+
+        if not self.email_enc:
+            return None
+        return decrypt_field(self.email_enc).decode("utf-8")
+
+    @email.setter
+    def email(self, value):
+        from app.crypto import blind_index, encrypt_field
+
+        norm = (value or "").strip().lower()
+        self.email_enc = encrypt_field(norm.encode("utf-8"))
+        self.email_hash = blind_index(norm)
+
+    @classmethod
+    def find_by_email(cls, email):
+        from app.crypto import blind_index
+
+        norm = (email or "").strip().lower()
+        return User.query.filter_by(email_hash=blind_index(norm)).first()
 
     def set_password(self, password):
         self.password_hash = ph.hash(password)
@@ -204,3 +228,84 @@ ACTIONS = ["view", "stream", "download", "manage"]
 ROLES = ["administrator", "band_member", "crew", "press", "fan_club", "registered"]
 # Crew used to key off file-type categories; with section categories they rely on audience_level.
 CREW_CATEGORIES = set()
+# ============================================================
+# Google OAuth 2.0 / OpenID Connect Identity
+# ============================================================
+
+class OAuthIdentity(db.Model):
+    __tablename__ = "oauth_identities"
+
+    id = db.Column(
+        db.String(36),
+        primary_key=True,
+        default=_uuid,
+    )
+
+    user_id = db.Column(
+        db.String(36),
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    provider = db.Column(
+        db.String(30),
+        nullable=False,
+    )
+
+    subject = db.Column(
+        db.Text,
+        nullable=False,
+    )
+
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=_now,
+    )
+
+    __table_args__ = (
+        db.UniqueConstraint(
+            "provider",
+            "subject",
+            name="uq_oauth_provider_subject",
+        ),
+    )
+
+    user = db.relationship(
+        "User",
+        backref="oauth_identities",
+    )
+
+class WatermarkDownload(db.Model):
+    __tablename__ = "watermark_downloads"
+
+    download_id = db.Column(
+        db.String(36),
+        primary_key=True,
+    )
+
+    user_id = db.Column(
+        db.String(36),
+        db.ForeignKey("users.id"),
+        nullable=False,
+        index=True,
+    )
+
+    content_id = db.Column(
+        db.String(36),
+        db.ForeignKey("content_items.id"),
+        nullable=False,
+        index=True,
+    )
+
+    watermark_type = db.Column(
+        db.String(50),
+        nullable=False,
+    )
+
+    created_at = db.Column(
+        db.DateTime(timezone=True),
+        nullable=False,
+        default=_now,
+    )

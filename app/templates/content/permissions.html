@@ -18,7 +18,6 @@
   <label>Available from (fans)</label>
   <input type="datetime-local" name="available_from_fans"
     value="{{ item.available_from_fans.strftime('%Y-%m-%dT%H:%M') if item.available_from_fans else '' }}">
-  <label class="check"><input type="checkbox" name="is_public" value="1" {% if item.is_public %}checked{% endif %}> Public</label>
   <button type="submit">Update audience / windows</button>
 </form>
 
