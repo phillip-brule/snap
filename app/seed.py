@@ -23,9 +23,9 @@ SAMPLE_USERS = [
 
 # Old Delivery-01 sample titles -> remove so dashboard isn't confusing
 LEGACY_SAMPLE_TITLES = [
-    "SNAP — Demo reel",
+    "SNAP: Demo reel",
     "Tour EU 2026 rider",
-    "SNAP — Album X master",
+    "SNAP: Album X master",
     "Fan BTS clip #1",
     "Public single artwork",
 ]
@@ -120,24 +120,24 @@ def seed():
 
     samples = [
         {
-            "title": "SNAP — Midnight (single)",
+            "title": "SNAP: Midnight (single)",
             "category": "new_music",
             "audience_level": "public",
-            "description": "Public single — stream the video below.",
+            "description": "Public single: stream the video below.",
             "media": "media_6.mp4",
             "is_public": True,
         },
         {
-            "title": "SNAP — Album X (press master)",
+            "title": "SNAP: Album X (press master)",
             "category": "new_music",
             "audience_level": "press",
-            "description": "Press master — embargoed until the press window opens.",
+            "description": "Press master: embargoed until the press window opens.",
             "media": "media_5.mp4",
             "available_from_press": now + timedelta(days=7),
             "is_public": False,
         },
         {
-            "title": "SNAP — Studio demo pack",
+            "title": "SNAP: Studio demo pack",
             "category": "new_music",
             "audience_level": "band",
             "description": "Internal demos for the band only.",
@@ -148,7 +148,7 @@ def seed():
             "title": "SNAP logo tee",
             "category": "merch",
             "audience_level": "public",
-            "description": "Merch drop — logo tee artwork.",
+            "description": "Merch drop: logo tee artwork.",
             "media": "media_1.jpg",
             "is_public": True,
         },

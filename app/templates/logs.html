@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Access log — SNAP Records{% endblock %}
+{% block title %}Access log: SNAP Records{% endblock %}
 {% block body %}
-<h1>Access log{% if item %} — {{ item.title }}{% endif %}</h1>
+<h1>Access log{% if item %}: {{ item.title }}{% endif %}</h1>
 {% if content_id and not item %}
 <p class="muted">Filtered to content {{ content_id }}</p>
 {% endif %}
@@ -21,11 +21,11 @@
     {% for log in logs %}
     <tr>
       <td class="mono">{{ log.at }}</td>
-      <td>{{ log.user.display_name if log.user else '—' }}</td>
+      <td>{{ log.user.display_name if log.user else '-' }}</td>
       <td>
         {% if log.content_item %}
         <a href="{{ url_for('content.detail', content_id=log.content_item_id) }}">{{ log.content_item.title }}</a>
-        {% else %}—{% endif %}
+        {% else %}-{% endif %}
       </td>
       <td>{{ log.action }}</td>
       <td class="{% if log.outcome == 'allowed' %}allowed{% else %}denied{% endif %}">{{ log.outcome }}</td>

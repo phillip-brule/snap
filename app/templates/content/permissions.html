@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Permissions — {{ item.title }}{% endblock %}
+{% block title %}Permissions: {{ item.title }}{% endblock %}
 {% block body %}
 <p class="muted"><a href="{{ url_for('content.detail', content_id=item.id) }}">← {{ item.title }}</a></p>
 <h1>Permission management</h1>
@@ -48,7 +48,7 @@
     <tr>
       <td>{{ g.user.email }}</td>
       <td>{{ g.action }}</td>
-      <td class="muted">{{ g.valid_from or '—' }} → {{ g.valid_until or '—' }}</td>
+      <td class="muted">{{ g.valid_from or '-' }} → {{ g.valid_until or '-' }}</td>
       <td>{% if g.revoked %}<span class="denied">revoked</span>{% else %}<span class="allowed">active</span>{% endif %}</td>
       <td>
         {% if not g.revoked %}

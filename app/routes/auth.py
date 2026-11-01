@@ -427,7 +427,7 @@ def accept_invite(token):
             existing = User.find_by_email(inv.email.lower())
             if existing:
                 flash(
-                    "Account already exists — log in.",
+                    "Account already exists just log in.",
                     "error",
                 )
                 return redirect(url_for("auth.login"))

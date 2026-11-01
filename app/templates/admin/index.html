@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Admin — SNAP Records{% endblock %}
+{% block title %}Admin: SNAP Records{% endblock %}
 {% block body %}
 <h1>Administration</h1>
 <p class="muted">{{ label.name }} · single-label portal</p>
@@ -35,7 +35,7 @@
   </select>
   <label>Band</label>
   <select name="band_id">
-    <option value="">— (admin only)</option>
+    <option value="">- (admin only)</option>
     {% for b in bands %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
   </select>
   <button type="submit">Create invite</button>
@@ -83,19 +83,19 @@
     <label class="check"><input type="checkbox" name="verify" value="1"> Mark email verified</label>
     <label>Add role</label>
     <select name="add_role">
-      <option value="">—</option>
+      <option value="">-</option>
       {% for r in roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
     </select>
     <label>Band for role</label>
     <select name="band_id">
-      <option value="">—</option>
+      <option value="">-</option>
       {% for b in bands %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
     </select>
     <label>Contact details (encrypted)</label>
     <input type="text" name="contact_details" value="{{ u.contact_details or '' }}" placeholder="phone / address (optional)">
     <label>Remove membership id</label>
     <select name="remove_membership">
-      <option value="">—</option>
+      <option value="">-</option>
       {% for m in u.memberships %}
       <option value="{{ m.id }}">{{ m.role }}{% if m.band %} @ {{ m.band.name }}{% endif %}</option>
       {% endfor %}
