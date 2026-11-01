@@ -4,6 +4,7 @@
 <div class="panel auth-box">
   <h1>Fan registration</h1>
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label>Display name</label>
     <input type="text" name="display_name" required>
     <label>Email</label>

@@ -5,6 +5,7 @@
 <h1>Permission management</h1>
 
 <form method="post" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="form_action" value="update_meta">
   <label>Audience level</label>
   <select name="audience_level">
@@ -23,6 +24,7 @@
 
 <h2>Grants</h2>
 <form method="post" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="form_action" value="add_grant">
   <label>User email</label>
   <input type="email" name="email" required>
@@ -51,6 +53,7 @@
       <td>
         {% if not g.revoked %}
         <form method="post" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="form_action" value="revoke">
           <input type="hidden" name="grant_id" value="{{ g.id }}">
           <button type="submit" class="secondary">Revoke</button>

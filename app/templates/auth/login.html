@@ -15,6 +15,7 @@
   <!-- Existing email/password login -->
   <form method="post"
         data-reaction="inspo/reactions/reaction_13.jpg">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
 
     <label for="email">Email</label>
     <input

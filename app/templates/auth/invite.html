@@ -5,6 +5,7 @@
   <h1>Accept invitation</h1>
   <p class="muted">{{ invitation.email }} · role: {{ invitation.intended_role }}</p>
   <form method="post">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label>Display name</label>
     <input type="text" name="display_name" required>
     <label>Password</label>

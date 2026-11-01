@@ -4,6 +4,7 @@
 <h1>Upload content</h1>
 <p class="hero-note">Band: {{ band.name }} · tape it to the wall</p>
 <form method="post" enctype="multipart/form-data" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label>Title</label>
   <input type="text" name="title" required>
   <label>Description</label>

@@ -9,7 +9,7 @@ from flask_login import LoginManager
 from werkzeug.middleware.proxy_fix import ProxyFix
 
 from app.crypto import set_kek
-from app.extensions import db, limiter
+from app.extensions import csrf, db, limiter
 from app.models import User
 
 load_dotenv()
@@ -68,6 +68,7 @@ def create_app():
     app.config["RATELIMIT_STORAGE_URI"] = "memory://"
     set_kek(app.config["CONTENT_KEK_PATH"])
     db.init_app(app)
+    csrf.init_app(app)
     login_manager.init_app(app)
     limiter.init_app(app)
 

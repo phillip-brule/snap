@@ -3,6 +3,7 @@
 {% block body %}
 <h1>Edit content</h1>
 <form method="post" enctype="multipart/form-data" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label>Title</label>
   <input type="text" name="title" value="{{ item.title }}" required>
   <label>Description</label>
@@ -35,6 +36,7 @@
   <button type="submit">Save</button>
 </form>
 <form method="post" class="panel" onsubmit="return confirm('Soft-delete this item?');">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="delete" value="1">
   <button type="submit" class="danger">Soft-delete</button>
 </form>

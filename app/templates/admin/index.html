@@ -14,6 +14,7 @@
   </tbody>
 </table>
 <form method="post" action="{{ url_for('admin.create_band') }}" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label>New band name</label>
   <input name="name" required>
   <label>Slug</label>
@@ -25,6 +26,7 @@
 
 <h2>Invite professional</h2>
 <form method="post" action="{{ url_for('admin.invite') }}" class="panel">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <label>Email</label>
   <input type="email" name="email" required>
   <label>Role</label>
@@ -71,6 +73,7 @@
     {% endfor %}
   </p>
   <form method="post" action="{{ url_for('admin.update_user', user_id=u.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
     <label>Status</label>
     <select name="status">
       {% for s in ['active', 'pending', 'disabled'] %}
