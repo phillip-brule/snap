@@ -22,7 +22,8 @@ PUBLIC_ENDPOINTS = {
 }
 
 # Anonymous responses that mean "not exposed".
-PROTECTED_STATUS = {401, 403, 404, 405}
+# 400: CSRFProtect rejects POSTs (no token) before @login_required can redirect.
+PROTECTED_STATUS = {400, 401, 403, 404, 405}
 
 
 @pytest.fixture(scope="module")
