@@ -46,7 +46,8 @@ jobs:
         with:
           target: "https://localhost"
           # self-signed cert from CI step above
-          cmd_options: "-config network.connection.timeoutInSecs=60"
+          # -z forwards args to ZAP; bare -config is parsed as -c (config file) → /zap/wrk/onfig
+          cmd_options: '-z "-config network.connection.timeoutInSecs=60"'
           allow_issue_writing: false
           fail_action: false
           artifact_name: zap-baseline
