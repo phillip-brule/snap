@@ -8,8 +8,19 @@ from pathlib import Path
 from flask import current_app
 
 from app.extensions import db
-from app.crypto import encrypt_data
-from app.models import Band, ContentItem, Label, Membership, User
+from app.crypto import decrypt_field, encrypt_data
+from app.models import (
+    AccessLog,
+    Band,
+    ContentGrant,
+    ContentItem,
+    Invitation,
+    Label,
+    Membership,
+    OAuthIdentity,
+    User,
+    WatermarkDownload,
+)
 
 
 SAMPLE_USERS = [
@@ -50,7 +61,76 @@ def _copy_media(folder: Path, media_name: str) -> tuple[Path, bytes] | None:
     return _write_encrypted(folder, media_name, src.read_bytes())
 
 
+def _purge_unreadable_users():
+    """Remove accounts sealed under a different content KEK.
+
+    Lookup uses a blind index derived from that same key, so those rows are
+    invisible to find_by_email. A later seed inserts a second copy, and
+    /admin/ then dies on the newest copy with "MAC check failed".
+    If the current key opens nobody, leave the rows alone: the mounted KEK
+    is probably the wrong file, and deleting would wipe the real accounts.
+    """
+    users = User.query.all()
+    if not users:
+        return True
+
+    stale = []
+    readable = []
+    for user in users:
+        try:
+            decrypt_field(bytes(user.email_enc))
+        except ValueError:
+            stale.append(user)
+        else:
+            readable.append(user)
+
+    if not stale:
+        return True
+
+    if not readable:
+        print(
+            "Seed: content KEK cannot decrypt any existing user. "
+            "Not inserting duplicates. Restore secrets/content_kek, "
+            "or reset with: docker compose down -v"
+        )
+        return False
+
+    keeper_id = readable[0].id
+    stale_ids = [user.id for user in stale]
+    Membership.query.filter(Membership.user_id.in_(stale_ids)).delete(synchronize_session=False)
+    OAuthIdentity.query.filter(OAuthIdentity.user_id.in_(stale_ids)).delete(synchronize_session=False)
+    WatermarkDownload.query.filter(WatermarkDownload.user_id.in_(stale_ids)).delete(
+        synchronize_session=False
+    )
+    ContentGrant.query.filter(
+        db.or_(
+            ContentGrant.user_id.in_(stale_ids),
+            ContentGrant.granted_by_user_id.in_(stale_ids),
+        )
+    ).delete(synchronize_session=False)
+    Invitation.query.filter(Invitation.invited_by_user_id.in_(stale_ids)).update(
+        {Invitation.invited_by_user_id: keeper_id},
+        synchronize_session=False,
+    )
+    AccessLog.query.filter(AccessLog.user_id.in_(stale_ids)).update(
+        {AccessLog.user_id: None},
+        synchronize_session=False,
+    )
+    ContentItem.query.filter(ContentItem.uploaded_by_user_id.in_(stale_ids)).update(
+        {ContentItem.uploaded_by_user_id: keeper_id},
+        synchronize_session=False,
+    )
+    for user in stale:
+        db.session.delete(user)
+    db.session.commit()
+    print(f"Seed: removed {len(stale)} user(s) encrypted with a different content KEK.")
+    return True
+
+
 def seed():
+    if not _purge_unreadable_users():
+        return
+
     label = Label.query.filter_by(slug="snap-records").first()
 
     if not label:
