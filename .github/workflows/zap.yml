@@ -10,6 +10,11 @@ on:
 jobs:
   zap:
     runs-on: ubuntu-latest
+    # Needed for every compose call (up and down); compose interpolates these from the file.
+    env:
+      FLASK_SECRET_KEY: ci-flask-secret
+      GOOGLE_CLIENT_ID: ci-unused.apps.googleusercontent.com
+      GOOGLE_CLIENT_SECRET: ci-unused-secret
     steps:
       - uses: actions/checkout@v4
 
@@ -24,10 +29,6 @@ jobs:
           chmod 600 secrets/content_kek secrets/server.key
 
       - name: Start stack
-        env:
-          FLASK_SECRET_KEY: ci-flask-secret
-          GOOGLE_CLIENT_ID: ci-unused.apps.googleusercontent.com
-          GOOGLE_CLIENT_SECRET: ci-unused-secret
         run: |
           docker compose up -d --build
           # wait until login responds (self-signed TLS)
