@@ -13,3 +13,5 @@ docs/PLAN.md
 secrets/
 certs/
 .zap/report/
+docs/ZAP.md
+docs/PARTIAL_FILE_CRYPTO.md
