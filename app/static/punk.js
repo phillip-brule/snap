@@ -93,4 +93,16 @@
       HTMLFormElement.prototype.submit.call(form);
     }, forced);
   });
+
+  // Autoplay media on detail pages (was inline; kept external for CSP script-src 'self')
+  var player = document.getElementById("snap-player");
+  if (player && player.play) {
+    var tryPlay = player.play();
+    if (tryPlay && tryPlay.catch) {
+      tryPlay.catch(function () {
+        player.muted = true;
+        return player.play();
+      });
+    }
+  }
 })();

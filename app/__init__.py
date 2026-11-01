@@ -117,6 +117,25 @@ def create_app():
     def too_many(_e):
         return "429 - Too many requests. Please wait a minute and try again.", 429
 
+    # CSP: allow own assets + Google Fonts; this forces it to block inline/foreign scripts (XSS hardening).
+    _CSP = (
+        "default-src 'self'; "
+        "script-src 'self'; "
+        "style-src 'self' https://fonts.googleapis.com; "
+        "font-src 'self' https://fonts.gstatic.com; "
+        "img-src 'self' data:; "
+        "media-src 'self'; "
+        "object-src 'none'; "
+        "base-uri 'self'; "
+        "form-action 'self'; "
+        "frame-ancestors 'none'"
+    )
+
+    @app.after_request
+    def set_csp(response):
+        response.headers["Content-Security-Policy"] = _CSP
+        return response
+
     with app.app_context():
         db.create_all()
 

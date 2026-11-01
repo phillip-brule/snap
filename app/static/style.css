@@ -579,3 +579,11 @@ th {
 .google-login-btn svg {
     flex-shrink: 0;
 }
+
+.form-inline {
+  display: inline;
+}
+
+.text-center {
+  text-align: center;
+}

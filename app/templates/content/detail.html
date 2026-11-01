@@ -84,17 +84,4 @@
     {% endif %}
   </div>
 </div>
-<script>
-(function () {
-  var p = document.getElementById("snap-player");
-  if (!p || !p.play) return;
-  var tryPlay = p.play();
-  if (tryPlay && tryPlay.catch) {
-    tryPlay.catch(function () {
-      p.muted = true;
-      return p.play();
-    });
-  }
-})();
-</script>
 {% endblock %}

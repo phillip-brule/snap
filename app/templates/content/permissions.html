@@ -52,7 +52,7 @@
       <td>{% if g.revoked %}<span class="denied">revoked</span>{% else %}<span class="allowed">active</span>{% endif %}</td>
       <td>
         {% if not g.revoked %}
-        <form method="post" style="display:inline">
+        <form method="post" class="form-inline">
           <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
           <input type="hidden" name="form_action" value="revoke">
           <input type="hidden" name="grant_id" value="{{ g.id }}">
