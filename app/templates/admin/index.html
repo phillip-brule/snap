@@ -4,6 +4,25 @@
 <h1>Administration</h1>
 <p class="muted">{{ label.name }} · single-label portal</p>
 
+{% if demo_user %}
+<div class="panel">
+  <p><strong>{{ demo_user.name }}</strong> · {{ demo_user.account_type }}
+    · 2FA {% if demo_user.totp_enabled %}on{% else %}off{% endif %}</p>
+  <p>Hash<br><span class="mono">{{ demo_user.password_hash or "-" }}</span></p>
+  <p>Email<br><span class="mono">{{ demo_user.email_enc }}</span></p>
+  <p>Email hash<br><span class="mono">{{ demo_user.email_hash }}</span></p>
+  <p>Failed {{ demo_user.failed_attempts }} · lock {{ demo_user.locked_until or "-" }}</p>
+  <p>PIN hash<br><span class="mono">{{ admin_pin_hash or "-" }}</span></p>
+</div>
+{% endif %}
+{% if demo_invite %}
+<div class="panel">
+  <p>{{ demo_invite.role }} · {{ demo_invite.status }}</p>
+  <p>Invite hash<br><span class="mono">{{ demo_invite.token_hash }}</span></p>
+  <p>Invite email<br><span class="mono">{{ demo_invite.email_enc }}</span></p>
+</div>
+{% endif %}
+
 <h2>Bands</h2>
 <table class="panel">
   <thead><tr><th>Name</th><th>Slug</th><th>Bio</th></tr></thead>
@@ -21,6 +40,8 @@
   <input name="slug" required>
   <label>Bio</label>
   <input name="bio">
+  <label>Admin PIN</label>
+  <input type="password" name="pin" required inputmode="numeric" autocomplete="off">
   <button type="submit">Create band</button>
 </form>
 
@@ -38,6 +59,8 @@
     <option value="">- (admin only)</option>
     {% for b in bands %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
   </select>
+  <label>Admin PIN</label>
+  <input type="password" name="pin" required inputmode="numeric" autocomplete="off">
   <button type="submit">Create invite</button>
 </form>
 
@@ -100,6 +123,8 @@
       <option value="{{ m.id }}">{{ m.role }}{% if m.band %} @ {{ m.band.name }}{% endif %}</option>
       {% endfor %}
     </select>
+    <label>Admin PIN</label>
+    <input type="password" name="pin" required inputmode="numeric" autocomplete="off">
     <button type="submit">Update user</button>
   </form>
 </div>

@@ -17,6 +17,14 @@ def _require_admin():
         abort(403)
 
 
+def _require_pin():
+    pin = (request.form.get("pin") or "").strip()
+    if current_user.check_step_up_pin(pin):
+        return True
+    flash("Wrong PIN.", "error")
+    return False
+
+
 @bp.route("/")
 @login_required
 def index():
@@ -25,6 +33,35 @@ def index():
     bands = Band.query.order_by(Band.name).all()
     users = User.query.order_by(User.created_at.desc()).all()
     invites = Invitation.query.order_by(Invitation.created_at.desc()).limit(50).all()
+    latest = users[0] if users else None
+    latest_invite = invites[0] if invites else None
+
+    def _hex_prefix(value, nbytes=12):
+        if not value:
+            return ""
+        return bytes(value)[:nbytes].hex()
+
+    demo_user = None
+    if latest:
+        demo_user = {
+            "name": latest.display_name,
+            "account_type": latest.account_type,
+            "totp_enabled": bool(latest.totp_enabled),
+            "password_hash": (latest.password_hash or "")[:64],
+            "email_enc": _hex_prefix(latest.email_enc),
+            "email_hash": (latest.email_hash or "")[:24],
+            "failed_attempts": latest.failed_attempts or 0,
+            "locked_until": latest.locked_until,
+        }
+    demo_invite = None
+    if latest_invite:
+        demo_invite = {
+            "role": latest_invite.intended_role,
+            "status": latest_invite.status,
+            "token_hash": (latest_invite.token_hash or "")[:24],
+            "email_enc": _hex_prefix(latest_invite.email_enc),
+            "expires_at": latest_invite.expires_at,
+        }
     return render_template(
         "admin/index.html",
         label=label,
@@ -32,6 +69,9 @@ def index():
         users=users,
         invites=invites,
         roles=ROLES,
+        demo_user=demo_user,
+        demo_invite=demo_invite,
+        admin_pin_hash=(current_user.step_up_pin_hash or "")[:48],
     )
 
 
@@ -39,6 +79,8 @@ def index():
 @login_required
 def create_band():
     _require_admin()
+    if not _require_pin():
+        return redirect(url_for("admin.index"))
     name = (request.form.get("name") or "").strip()
     slug = (request.form.get("slug") or "").strip().lower().replace(" ", "-")
     if not name or not slug:
@@ -59,6 +101,8 @@ def create_band():
 @login_required
 def invite():
     _require_admin()
+    if not _require_pin():
+        return redirect(url_for("admin.index"))
     email = (request.form.get("email") or "").strip().lower()
     role = request.form.get("role")
     band_id = request.form.get("band_id") or None
@@ -92,6 +136,8 @@ def invite():
 @login_required
 def update_user(user_id):
     _require_admin()
+    if not _require_pin():
+        return redirect(url_for("admin.index"))
     user = db.session.get(User, user_id) or abort(404)
     status = request.form.get("status")
     if status in ("active", "disabled", "pending"):

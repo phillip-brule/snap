@@ -138,5 +138,10 @@ def create_app():
 
     with app.app_context():
         db.create_all()
+        from sqlalchemy import text
+        db.session.execute(text(
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS step_up_pin_hash text"
+        ))
+        db.session.commit()
 
     return app

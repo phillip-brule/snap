@@ -62,6 +62,7 @@ class User(UserMixin, db.Model):
     totp_secret_enc = db.Column(db.LargeBinary)
     totp_enabled = db.Column(db.Boolean, nullable=False, default=False)
     contact_details_enc = db.Column(db.LargeBinary)
+    step_up_pin_hash = db.Column(db.Text)
 
     label = db.relationship("Label", back_populates="users")
     memberships = db.relationship("Membership", back_populates="user", cascade="all, delete-orphan")
@@ -136,6 +137,18 @@ class User(UserMixin, db.Model):
             return False
         if ph.check_needs_rehash(self.password_hash):
             self.password_hash = ph.hash(password)
+        return True
+
+    def set_step_up_pin(self, pin):
+        self.step_up_pin_hash = ph.hash(pin)
+
+    def check_step_up_pin(self, pin):
+        if not self.step_up_pin_hash or not pin:
+            return False
+        try:
+            ph.verify(self.step_up_pin_hash, pin)
+        except (VerificationError, InvalidHashError):
+            return False
         return True
 
 

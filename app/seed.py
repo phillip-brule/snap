@@ -178,6 +178,8 @@ def seed():
             )
 
         users_by_email[email] = user
+        if role == "administrator" and not user.step_up_pin_hash:
+            user.set_step_up_pin("135790")
 
     db.session.commit()
 
