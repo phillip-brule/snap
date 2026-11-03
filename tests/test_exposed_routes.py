@@ -62,6 +62,24 @@ def test_every_non_public_route_requires_login(client):
     assert not exposed, "Routes reachable without login:\n" + "\n".join(exposed)
 
 
+def test_google_login_redirect_body_stays_under_zap_limit(client):
+    """ZAP 10044 flags a redirect whose body is longer than Location length + 300."""
+    c, _app = client
+    r = c.get("/auth/google/login")
+    assert r.status_code == 302
+    location = r.headers["Location"]
+    assert "accounts.google.com" in location
+    assert len(r.data) <= len(location) + 300
+
+
+def test_pages_do_not_load_remote_stylesheets(client):
+    c, _app = client
+    r = c.get("/register")
+    assert r.status_code == 200
+    assert b"fonts.googleapis.com" not in r.data
+    assert b"fonts.gstatic.com" not in r.data
+
+
 def test_public_allowlist_is_current(client):
     """Fail if an allowlisted endpoint disappears, so the list never silently grows stale."""
     _, app = client

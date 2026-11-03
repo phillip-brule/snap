@@ -194,7 +194,11 @@ def google_login():
         _external=True,
     )
 
-    return oauth.google.authorize_redirect(redirect_uri)
+    response = oauth.google.authorize_redirect(redirect_uri)
+    # Werkzeug's redirect HTML repeats the OAuth URL, so the body is longer than
+    # ZAP allows for a redirect (alert 10044: Location length + 300).
+    response.data = b""
+    return response
 
 
 # ============================================================

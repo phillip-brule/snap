@@ -117,12 +117,12 @@ def create_app():
     def too_many(_e):
         return "429 - Too many requests. Please wait a minute and try again.", 429
 
-    # CSP: allow own assets + Google Fonts; this forces it to block inline/foreign scripts (XSS hardening).
+    # CSP: own assets only. Blocks inline and third-party scripts (XSS hardening).
     _CSP = (
         "default-src 'self'; "
         "script-src 'self'; "
-        "style-src 'self' https://fonts.googleapis.com; "
-        "font-src 'self' https://fonts.gstatic.com; "
+        "style-src 'self'; "
+        "font-src 'self'; "
         "img-src 'self' data:; "
         "media-src 'self'; "
         "object-src 'none'; "
