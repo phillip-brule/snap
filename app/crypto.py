@@ -4,9 +4,8 @@ import hmac
 from Crypto.Cipher import AES
 from Crypto.Random import get_random_bytes
 
-_master = None
 _file_kek = None
-_field_kek = None
+_db_field_key = None
 _blind_key = None
 
 # How many bytes of the plaintext to encrypt
@@ -14,18 +13,29 @@ PREFIX_LEN = 64
 # full prefix length: nonce(16) + tag(16) + PREFIX_LEN
 SEALED_PREFIX_LEN = PREFIX_LEN + 32
 
+# secrets/content_kek layout: 3 × 32-byte random keys (no derivation)
+_KEY_LEN = 32
+_BUNDLE_LEN = _KEY_LEN * 3
+
 # Read more about functions in docs:
 # https://www.pycryptodome.org/src/cipher/modern#crypto-cipher-aes-aesmodecipher-encrypt-and-digest
 # and more about AES:
 # https://www.pycryptodome.org/src/cipher/aes
 
+
 def set_kek(kek_path):
-    global _master, _file_kek, _field_kek, _blind_key
+    """Load three independent random keys from the Docker secret file."""
+    global _file_kek, _db_field_key, _blind_key
     with open(kek_path, "rb") as f:
-        _master = f.read()
-    _file_kek = hmac.new(_master, b"snap-records/file-kek", hashlib.sha256).digest()
-    _field_kek = hmac.new(_master, b"snap-records/field-kek", hashlib.sha256).digest()
-    _blind_key = hmac.new(_master, b"snap-records/blind-index", hashlib.sha256).digest()
+        bundle = f.read()
+    if len(bundle) != _BUNDLE_LEN:
+        raise ValueError(
+            f"content_kek must be {_BUNDLE_LEN} random bytes "
+            f"(file_kek + db_field_key + blind_index); got {len(bundle)}"
+        )
+    _file_kek = bundle[0:_KEY_LEN]
+    _db_field_key = bundle[_KEY_LEN : _KEY_LEN * 2]
+    _blind_key = bundle[_KEY_LEN * 2 : _KEY_LEN * 3]
 
 
 def _seal(key, plaintext, aad=b""):
@@ -67,11 +77,11 @@ def decrypt_data(encrypted_data, wrapped_dek):
 
 
 def encrypt_field(plaintext: bytes) -> bytes:
-    return _seal(_field_kek, plaintext)
+    return _seal(_db_field_key, plaintext)
 
 
 def decrypt_field(sealed: bytes) -> bytes:
-    return _unseal(_field_kek, sealed)
+    return _unseal(_db_field_key, sealed)
 
 
 def blind_index(value: str) -> str:

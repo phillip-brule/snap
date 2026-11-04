@@ -1,7 +1,7 @@
 # SNAP Records
 
 ```bash
-./kek_gen.sh      # content encryption master key
+./kek_gen.sh      # random file_kek + db_field_key + blind_index (96 bytes)
 ./certs_gen.sh    # SNAP Root CA + nginx server certificate (TLS)
 docker compose up -d --build
 ```

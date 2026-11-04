@@ -3,7 +3,7 @@ name: zap
 
 on:
   push:
-    branches: [main, phillip]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
@@ -21,7 +21,7 @@ jobs:
       - name: Generate local secrets for CI
         run: |
           mkdir -p secrets certs
-          openssl rand -out secrets/content_kek 32
+          openssl rand -out secrets/content_kek 96
           openssl req -x509 -newkey rsa:2048 -nodes \
             -keyout secrets/server.key \
             -out certs/fullchain.crt \
