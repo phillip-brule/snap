@@ -79,6 +79,20 @@ def _decrypt_file(storage_path, wrapped_dek):
     return decrypt_data(ciphertext, wrapped_dek)
 
 
+def _hard_delete_item(item):
+    """Wipe the volume file (save disk) but keep the row with is_deleted=True for XACML."""
+    path = Path(item.storage_path) if item.storage_path else None
+    if path and path.is_file():
+        path.unlink(missing_ok=True)
+        parent = path.parent
+        if parent.is_dir() and not any(parent.iterdir()):
+            parent.rmdir()
+    item.is_deleted = True
+    item.wrapped_dek = None
+    item.storage_path = ""
+    item.updated_at = datetime.now(timezone.utc)
+
+
 # ============================================================
 # Upload
 # ============================================================
@@ -382,14 +396,9 @@ def edit(content_id):
     if request.method == "POST":
 
         if request.form.get("delete"):
-            item.is_deleted = True
-            item.wrapped_dek = None  # crypto-shred: ciphertext alone is useless
-            item.updated_at = datetime.now(timezone.utc)
-
+            _hard_delete_item(item)
             db.session.commit()
-
-            flash("Content soft-deleted.", "ok")
-
+            flash("Content deleted (file removed from disk).", "ok")
             return redirect(url_for("dashboard.index"))
 
         title = (request.form.get("title") or "").strip()

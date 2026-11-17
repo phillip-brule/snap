@@ -35,9 +35,9 @@
   <p class="muted">Current: {{ item.original_filename }}</p>
   <button type="submit">Save</button>
 </form>
-<form method="post" class="panel" onsubmit="return confirm('Soft-delete this item?');">
+<form method="post" class="panel" onsubmit="return confirm('Permanently delete this item and its file?');">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
   <input type="hidden" name="delete" value="1">
-  <button type="submit" class="danger">Soft-delete</button>
+  <button type="submit" class="danger">Delete</button>
 </form>
 {% endblock %}

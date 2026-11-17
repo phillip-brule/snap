@@ -101,16 +101,24 @@ def seed():
 
     db.session.commit()
 
-    # Mark old sample content as deleted
-    for title in LEGACY_SAMPLE_TITLES:
-        old_items = ContentItem.query.filter_by(
-            title=title,
-            band_id=band.id,
-            is_deleted=False,
-        ).all()
+    def _tombstone(item):
+        """Wipe volume file; keep row with is_deleted so XACML deleted-deny still applies."""
+        path = Path(item.storage_path) if item.storage_path else None
+        if path and path.is_file():
+            path.unlink(missing_ok=True)
+            parent = path.parent
+            if parent.is_dir() and not any(parent.iterdir()):
+                parent.rmdir()
+        item.is_deleted = True
+        item.wrapped_dek = None
+        item.storage_path = ""
 
-        for old in old_items:
-            old.is_deleted = True
+    # Tombstone legacy sample titles (hide from dashboard; free disk)
+    for title in LEGACY_SAMPLE_TITLES:
+        for old in ContentItem.query.filter_by(
+            title=title, band_id=band.id, is_deleted=False
+        ).all():
+            _tombstone(old)
 
     db.session.commit()
 
@@ -212,11 +220,7 @@ def seed():
             band_id=band.id,
         ).first()
 
-        if existing and existing.is_deleted:
-            item = existing
-            item.is_deleted = False
-
-        elif existing:
+        if existing:
             item = existing
 
         else:
