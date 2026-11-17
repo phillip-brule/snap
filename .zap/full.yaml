@@ -4,7 +4,7 @@
 # path traversal, command injection, ...). Only ever run it against a throwaway stack.
 #
 # Run locally against a running stack (docker compose up):
-#   docker run --rm --network host -v "$PWD/.zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:2.16.1 \
+#   docker run --rm --network host -v "$PWD/.zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:2.17.0 \
 #     zap.sh -cmd -autorun /zap/wrk/full.yaml
 env:
   contexts:

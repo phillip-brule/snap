@@ -83,6 +83,6 @@ Run ZAP locally against your running stack:
 
 ```bash
 mkdir -p .zap/report
-docker run --rm --network host -v "$PWD/.zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:2.16.1 \
+docker run --rm --network host -v "$PWD/.zap:/zap/wrk" ghcr.io/zaproxy/zaproxy:2.17.0 \
   zap.sh -cmd -autorun /zap/wrk/baseline.yaml      # report: .zap/report/zap-report.html
 ```
