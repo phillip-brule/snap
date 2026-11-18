@@ -3,8 +3,18 @@
 ```bash
 ./kek_gen.sh      # random file_kek + db_field_key + blind_index (96 bytes)
 ./certs_gen.sh    # SNAP Root CA + nginx server certificate (TLS)
+# settings docker compose needs (.env is git-ignored)
+cat > .env <<EOF
+FLASK_SECRET_KEY=$(openssl rand -hex 32)
+GOOGLE_CLIENT_ID=dummy
+GOOGLE_CLIENT_SECRET=dummy
+EOF
 docker compose up -d --build
 ```
+
+With the dummy Google values everything works except "Continue with Google". To try Google
+sign-in, put a real OAuth client ID and secret in `.env` (Google Cloud Console, authorised
+redirect URI `https://localhost/auth/google/callback`).
 
 Open https://localhost (http://localhost redirects to HTTPS; Flask is no longer exposed on :5000).
 
@@ -28,7 +38,7 @@ curl --cacert certs/snap-root-ca.crt -I https://localhost
 | `fan@example.com`     | `fan123`     |
 
 ```bash
-docker compose down -v --remove-orphans //for db reset
+docker compose down -v --remove-orphans   # reset the database
 ```
 
 Follow logs:

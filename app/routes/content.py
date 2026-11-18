@@ -28,7 +28,6 @@ from app.models import (
     CATEGORIES,
     CATEGORY_LABELS,
     ACTIONS,
-    Band,
     ContentGrant,
     ContentItem,
     User,
@@ -97,18 +96,31 @@ def _hard_delete_item(item):
 # Upload
 # ============================================================
 
+def _upload_bands(user):
+    """Bands the user may upload to: every band where they are a band_member."""
+    bands = {
+        m.band.id: m.band
+        for m in user.memberships
+        if m.role == "band_member" and m.band and can_upload(user, m.band.id)
+    }
+    return sorted(bands.values(), key=lambda b: b.name.lower())
+
+
 @bp.route("/upload", methods=["GET", "POST"])
 @login_required
 def upload():
-    band = Band.query.filter_by(slug="snap").first()
+    bands = _upload_bands(current_user)
 
-    if not band:
-        abort(404)
-
-    if not can_upload(current_user, band.id):
+    if not bands:
         abort(403)
 
     if request.method == "POST":
+        # The band comes from the form, so check it again on the server:
+        # only one of the user's own bands is accepted.
+        band = next((b for b in bands if b.id == request.form.get("band_id")), None)
+        if band is None:
+            abort(403)
+
         title = (request.form.get("title") or "").strip()
         category = request.form.get("category")
         audience = request.form.get("audience_level")
@@ -167,7 +179,7 @@ def upload():
 
     return render_template(
         "content/upload.html",
-        band=band,
+        bands=bands,
         categories=CATEGORIES,
         category_labels=CATEGORY_LABELS,
         audiences=AUDIENCE_LEVELS,

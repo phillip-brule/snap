@@ -2,9 +2,21 @@
 {% block title %}Upload: SNAP Records{% endblock %}
 {% block body %}
 <h1>Upload content</h1>
-<p class="hero-note">Band: {{ band.name }} · tape it to the wall</p>
+{% if bands | length == 1 %}
+<p class="hero-note">Band: {{ bands[0].name }} · tape it to the wall</p>
+{% else %}
+<p class="hero-note">tape it to the wall</p>
+{% endif %}
 <form method="post" enctype="multipart/form-data" class="panel">
   <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  {% if bands | length == 1 %}
+  <input type="hidden" name="band_id" value="{{ bands[0].id }}">
+  {% else %}
+  <label>Band</label>
+  <select name="band_id" required>
+    {% for b in bands %}<option value="{{ b.id }}">{{ b.name }}</option>{% endfor %}
+  </select>
+  {% endif %}
   <label>Title</label>
   <input type="text" name="title" required>
   <label>Description</label>
